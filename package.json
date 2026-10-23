@@ -1,17 +1,35 @@
 {
   "name": "nstack",
-  "version": "0.0.1-mock",
-  "description": "Open your web app as several users at several screen sizes, side by side, already logged in. (UI mock)",
+  "version": "0.1.0-dev",
+  "description": "Open your web app as several users at several screen sizes, side by side, already logged in.",
   "bin": {
     "nstack": "bin/nstack.js"
   },
   "files": [
     "bin",
+    "dist/src",
+    "renderer",
     "mock",
     "docs"
   ],
-  "engines": {
-    "node": ">=20"
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc && node --test dist/test/*.test.js",
+    "prepare": "tsc"
   },
-  "license": "MIT"
+  "engines": {
+    "node": ">=22.12"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^15.0.0",
+    "electron": "^45.0.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
 }

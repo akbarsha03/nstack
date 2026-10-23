@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+<title>nstack</title>
+<!-- look and copy from mock/index.html (the approved design reference) -->
+<style>
+:root{--bg:#0c0f13;--panel:#13181f;--panel2:#1a212a;--line:#252e39;--text:#d6dce3;--dim:#7c8792;--acc:#5eead4;--ok:#4ade80;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:13px/1.4 var(--sans);display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:4px 10px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.top{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex:none}
+.brand{font:700 15px var(--mono);color:var(--acc);letter-spacing:-.5px}
+.brand small{color:var(--dim);font-weight:400;font-size:11px;margin-left:4px}
+.base{font:12px var(--mono);background:var(--bg);border:1px solid var(--line);padding:4px 8px;border-radius:5px;color:var(--dim)}
+.spaces{display:flex;gap:6px;padding:8px 14px;background:#0f1318;border-bottom:1px solid var(--line);overflow-x:auto;flex:none;align-items:flex-end}
+.sp{display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 8px;border-radius:8px;background:none;border:1px solid transparent;flex:none}
+.sp:hover{background:var(--panel)}
+.sp.cur{border-color:var(--acc);background:var(--panel2)}
+.mini{height:62px;min-width:62px;overflow:hidden;border-radius:4px;background:#fff;box-shadow:0 0 0 1px var(--line);display:block}
+.sp.cur .mini{box-shadow:0 0 0 2px var(--acc)}
+.allmini{display:flex;gap:4px;align-items:center;justify-content:center;padding:0 8px;background:var(--panel2)}
+.allmini i{background:#64748b;border-radius:2px;width:22px;height:30px}
+.sp-l{display:flex;align-items:center;gap:5px;font:11px var(--mono);white-space:nowrap}
+.sp-l small{color:var(--dim)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);flex:none}
+.keys{margin-left:auto;align-self:center;font:11px var(--mono);color:var(--dim);white-space:nowrap;padding-left:12px}
+main{flex:1}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="brand">nstack</span>
+  <span class="base" id="base" title="baseUrl from nstack.yml"></span>
+</div>
+<nav class="spaces" id="spaces" aria-label="Spaces"></nav>
+<main id="stage"></main>
+<script src="shell.js"></script>
+</body>
+</html>
