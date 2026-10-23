@@ -120,7 +120,7 @@ Default view: one persona per space, scaled to fit the shell, true aspect ratio.
 One desktop shell window that hosts N isolated web views. Electron gives every piece for free, so the MVP is Electron, not Playwright:
 
 ```
-nstack (Node 20+, TypeScript, Electron, ~900 lines)
+nstack (Node 22.12+, TypeScript, Electron, ~900 lines)
 ├─ cli.ts            commander: init / login / up / add / shot / reset → spawns the shell
 ├─ config.ts         load + validate nstack.yml (zod), expand $ENV, write-back for `add`
 ├─ devices.ts        preset name → { width, height, dpr, touch, userAgent } | WxH

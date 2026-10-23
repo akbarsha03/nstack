@@ -19,9 +19,29 @@ It serves a clickable UI mock on a free local port and opens it in your browser.
 
 <!-- screenshot: docs/mock.png -->
 
+## Run it (milestone 1)
+
+```sh
+git clone https://github.com/akbarsha03/nstack.git && cd nstack && npm i
+cd ~/code/your-app && node ~/path/to/nstack/bin/nstack.js up      # or `npm i -g .` then `nstack up`
+```
+
+`nstack up [personas…]` reads `nstack.yml` from the current folder (or `-c <file>`) and opens one window: one space per persona plus **All**, switched with the strip, ← / →, `1`–`9`, `0`/`a`. Each persona has its own cookies and storage, kept in `.nstack/` in your project, so a login survives restarts. Minimal config:
+
+```yaml
+baseUrl: http://localhost:3000
+personas:
+  admin:    { device: desktop, start: /dashboard }
+  customer: { device: ipad-air, start: /portal }
+```
+
+`$ENV` / `${ENV}` in any value is read from the environment. Device sizes, login/reset, the control bar, `shot` and `--sync` come in the next milestones.
+
+Linux note: on Ubuntu 24+ Chromium's sandbox needs `chrome-sandbox` to be setuid root; until then nstack runs without it and prints the one-line fix.
+
 ## Status
 
-Spec + UI mock, nothing real yet. The product spec is [docs/MVP.md](docs/MVP.md).
+Milestone 1 of [docs/MVP.md](docs/MVP.md): shell, spaces, thumbnails, All space, per-persona sessions.
 
 ## npm name
 
