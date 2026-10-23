@@ -87,6 +87,15 @@ main{flex:1}
 .fake .ck{display:flex;align-items:center;gap:8px;font-size:14px;color:#1e293b;margin:0}
 .fake .ck input{width:auto;margin:0}
 .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+#shots{background:#000e}
+.shots{margin:auto;display:flex;flex-direction:column;gap:16px;align-items:center}
+.shotgrid{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.shotgrid figure{margin:0;animation:snap .5s}
+.shotgrid img{display:block;border-radius:6px;box-shadow:0 0 0 1px var(--line),0 10px 30px #0009;background:#fff}
+.shotgrid figcaption{font:12px var(--mono);color:var(--acc);margin-top:6px}
+.shotgrid figcaption span{color:var(--dim);margin-left:6px}
+.shotgrid .skip figcaption{color:var(--bad)}
+@keyframes snap{0%{filter:brightness(3)}100%{filter:none}}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,92vw);background:var(--panel);border-left:1px solid var(--line);z-index:11;
   transform:translateX(105%);transition:transform .25s;display:flex;flex-direction:column;box-shadow:-10px 0 30px #0008}
 .drawer.open{transform:none}
@@ -105,7 +114,7 @@ main{flex:1}
   <span class="grow"></span>
   <button class="primary" id="b-up" title="nstack up">Up</button>
   <button id="b-login" title="nstack login">Login</button>
-  <button id="b-shot" title="nstack shot · coming in the next milestone" disabled>Shot</button>
+  <button id="b-shot" title="nstack shot">Shot</button>
   <button id="b-sync" title="nstack up --sync · coming in a later milestone" aria-pressed="false" disabled>Sync</button>
   <div class="seg" role="group" aria-label="tile mode (All space)" title="tile mode, applies in the All space">
     <button data-tile="grid">grid</button><button data-tile="row">row</button>
@@ -139,6 +148,13 @@ main{flex:1}
       <button type="submit" class="primary">Add space</button>
     </div>
   </form>
+</div>
+
+<div class="scrim" id="shots" role="dialog" aria-modal="true" aria-label="Screenshots">
+  <div class="shots">
+    <div class="shotgrid" id="shotgrid"></div>
+    <button data-close>Close</button>
+  </div>
 </div>
 
 <aside class="drawer" id="yml" aria-label="nstack.yml">

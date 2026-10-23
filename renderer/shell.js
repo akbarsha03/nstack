@@ -93,6 +93,16 @@ nstack.on('thumb', (name, url) => {
   const img = document.querySelector(`.sp[data-space="${CSS.escape(name)}"] img`);
   if (img) img.src = url;
 });
+// saved shots, or the logged-out note in place of one
+nstack.on('shots', shots => {
+  $('#b-shot').disabled = false;
+  if (!shots) return;
+  $('#shotgrid').innerHTML = shots.map(s => s.src
+    ? `<figure><img src="${s.src}" alt="${esc(s.name)} screenshot"><figcaption>.nstack/shots/${esc(s.name)}.png<span>${s.width}×${s.height}</span></figcaption></figure>`
+    : `<figure class="skip"><figcaption>${esc(s.line)}</figcaption></figure>`).join('');
+  show('#shots');
+  setTimeout(() => $('#shots [data-close]').focus(), 30);
+});
 
 // the frame (title bar = persona · device · real size) around each visible persona; logged-out ones get the placeholder
 nstack.on('frames', frames => {
@@ -125,6 +135,7 @@ document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click
 document.querySelectorAll('.scrim').forEach(s => s.addEventListener('click', e => { if (e.target === s) closeAll(); }));
 $('#b-up').onclick = () => nstack.send('up');
 $('#b-login').onclick = () => nstack.send('login');
+$('#b-shot').onclick = () => { $('#b-shot').disabled = true; nstack.send('shot'); };
 $('#b-yml').onclick = () => { nstack.send('yml'); show('#yml'); };
 document.querySelectorAll('[data-tile]').forEach(b => b.onclick = () => nstack.send('tile', b.dataset.tile));
 $('#b-term').onclick = () => $('#term').classList.toggle('closed'); // #stage shrinks or grows, the observer below re-lays out

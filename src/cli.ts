@@ -32,7 +32,7 @@ function load(configFile: string, names: string[], env: NodeJS.ProcessEnv = proc
 }
 
 // run one of the Electron entry points in dist/src/main with the loaded config
-function launch(entry: string, payload: { config: Config; names: string[]; dir: string; file: string; space?: string }) {
+function launch(entry: string, payload: { config: Config; names: string[]; dir: string; file: string; space?: string; path?: string }) {
   const electron = require('electron') as unknown as string;
   const args = [path.join(__dirname, 'main', entry)];
   if (needsNoSandbox(electron)) {
@@ -109,9 +109,29 @@ program.command('add')
     launch('main.js', { config, names: all, dir, file, space: name });
   });
 
+program.command('shot')
+  .description('screenshot every persona at path (default: each start) to .nstack/shots/<persona>.png')
+  .argument('[path]', 'app path, e.g. /invoices')
+  .option('-c, --config <file>', 'config file', 'nstack.yml')
+  .action(async (at: string | undefined, opts: { config: string }) => {
+    // shooting never logs in, so unset $ENV secrets are fine here
+    const { file, dir, config, all } = load(opts.config, [], anyEnv);
+    const reply = await send(dir, { shot: at ?? null }).catch((e: Error) => ({ error: e.message }));
+    if (reply?.error) {
+      console.error(`the running shell said: ${reply.error}`);
+      process.exit(1);
+    }
+    if (reply) {
+      for (const s of reply.shots) (s.status === 'ok' ? console.log : console.error)(s.line);
+      process.exit(reply.shots.some((s: { status: string }) => s.status === 'fail') ? 1 : 0);
+    }
+    // no shell here: shoot offscreen and exit
+    launch('shot-main.js', { config, names: all, dir, file, path: at });
+  });
+
 program.command('mock', { isDefault: true }).description('serve and open the clickable UI mock').action(serveMock);
 
-for (const cmd of ['init', 'shot']) {
+for (const cmd of ['init']) {
   program.command(cmd, { hidden: true }).allowUnknownOption().allowExcessArguments().action(() => {
     console.error(`nstack ${cmd}: not built yet, see docs/MVP.md`);
     process.exit(1);

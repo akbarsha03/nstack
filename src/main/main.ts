@@ -1,13 +1,14 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { app, BrowserWindow, WebContentsView, ipcMain, type Rectangle } from 'electron';
+import { app, BrowserWindow, WebContentsView, ipcMain, nativeImage, type Rectangle } from 'electron';
 import { addPersona, parseConfig, ConfigError, type Config } from '../config.js';
 import { parseDevice, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
 import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, inset } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
+import { shoot } from './shot.js';
 
 type Persona = Config['personas'][string];
 const up = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string; file: string; space?: string };
@@ -183,6 +184,20 @@ async function reset(name: string) {
   sendState();
 }
 
+// Shot button and `nstack shot` from a terminal; personas already known to be logged out are skipped
+let shooting = false;
+async function shot(at?: string) {
+  if (shooting) throw new Error('a shot is already running');
+  shooting = true;
+  try {
+    const shots = await shoot(config, names, dir, at, out);
+    log(`nstack shot${at ? ' ' + at : ''}`, shots.map(s => [s.status === 'ok' ? 'ok' : 'bad', s.line]));
+    return shots;
+  } finally {
+    shooting = false;
+  }
+}
+
 app.whenReady().then(() => {
   fs.mkdirSync(nstackDir, { recursive: true });
   win = new BrowserWindow({
@@ -231,8 +246,12 @@ app.whenReady().then(() => {
       log(addCmd(a.name, { device: a.device, start: a.start }), [['bad', (e as Error).message]]);
     }
   });
-  // `nstack add` from a terminal in this folder
-  serve(dir, msg => {
+  ipcMain.on('nstack:shot', () => shot().then(shots => win.webContents.send('nstack:shots', shots.map(s => ({
+    ...s, src: s.png && nativeImage.createFromPath(s.png).resize({ height: Math.min(340, s.height!) }).toDataURL(),
+  }))), e => { log('nstack shot', [['bad', (e as Error).message]]); win.webContents.send('nstack:shots', null); }));
+  // `nstack add` / `nstack shot` from a terminal in this folder
+  serve(dir, async msg => {
+    if (msg && 'shot' in msg) return { shots: (await shot(msg.shot ?? undefined)).map(({ name, status, line }) => ({ name, status, line })) };
     // the CLI already wrote nstack.yml; read the persona from there rather than trusting the socket
     const p = typeof msg?.add === 'string' && parseConfig(fs.readFileSync(file, 'utf8'), process.env, path.basename(file)).personas[msg.add];
     if (!p) throw new Error(`${msg?.add} is not in ${path.basename(file)}`);
