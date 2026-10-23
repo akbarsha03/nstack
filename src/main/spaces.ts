@@ -39,3 +39,18 @@ export function fitFrames(cells: Rect[], sizes: { width: number; height: number 
 }
 
 export const inset = (r: Rect, p: number): Rect => ({ x: r.x + p, y: r.y + p, width: Math.max(0, r.width - 2 * p), height: Math.max(0, r.height - 2 * p) });
+
+// All space, row mode: one row, every window the same height, shrunk until the row fits the stage width
+// ponytail: no sideways scroll (native views sit above the shell page, so it can't scroll them); add when rows get long
+export function rowFrames(stage: Rect, sizes: { width: number; height: number }[], gap = 8): Frame[] {
+  const aspect = sizes.reduce((n, d) => n + d.width / d.height, 0);
+  const h = Math.max(20, Math.floor(Math.min(stage.height - 2 * gap - BAR, (stage.width - gap * (sizes.length + 1)) / aspect, ...sizes.map(d => d.height))));
+  const widths = sizes.map(d => Math.round(d.width * h / d.height));
+  let x = stage.x + Math.max(gap, Math.floor((stage.width - widths.reduce((a, b) => a + b, 0) - gap * (sizes.length - 1)) / 2));
+  const y = stage.y + Math.floor((stage.height - h - BAR) / 2);
+  return sizes.map((d, i) => {
+    const f = { scale: h / d.height, frame: { x, y, width: widths[i], height: h + BAR }, view: { x, y: y + BAR, width: widths[i], height: h } };
+    x += widths[i] + gap;
+    return f;
+  });
+}

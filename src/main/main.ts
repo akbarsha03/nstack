@@ -1,63 +1,98 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { app, BrowserWindow, WebContentsView, ipcMain, type Rectangle } from 'electron';
-import type { Config } from '../config.js';
-import { parseDevice, type Device } from '../devices.js';
-import { tileGrid, nextSpace, spaceForKey, fitFrames, inset } from './spaces.js';
+import { addPersona, parseConfig, ConfigError, type Config } from '../config.js';
+import { parseDevice, PRESETS, type Device } from '../devices.js';
+import { serve } from '../ipc.js';
+import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, inset } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
+import { login } from './login-window.js';
 
-const { config, names, dir } = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string };
+type Persona = Config['personas'][string];
+const up = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string; file: string; space?: string };
+const { config, dir, file } = up;
+const names = [...up.names]; // grows with `nstack add` / the + tile
 const nstackDir = path.join(dir, '.nstack');
 // per-project profile: each persona's `persist:<name>` partition (cookies, storage) lives under here
 app.setPath('userData', path.join(nstackDir, 'electron'));
 
+// last space and tile mode survive restarts
 const stateFile = path.join(nstackDir, 'state.json');
-const spaces = ['all', ...names];
-let space: string = (() => {
-  try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')).space; } catch { return names[0]; }
-})();
-if (!spaces.includes(space)) space = names[0];
+const saved = (() => { try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { return {}; } })();
+const spaces = () => ['all', ...names];
+let space: string = up.space ?? saved.space ?? names[0];
+if (!spaces().includes(space)) space = names[0];
+let tile: 'grid' | 'row' = saved.tile === 'grid' || saved.tile === 'row' ? saved.tile : config.tile;
+const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile })); } catch {} };
 
 const THUMB_MS = 1500;
 let win: BrowserWindow;
+let ready = false;
 let stage: Rectangle = { x: 0, y: 0, width: 0, height: 0 };
+let covered = false; // a dialog or the yml drawer is open; native views paint above the shell page, so hide them
 const views = new Map<string, WebContentsView>();
-const startUrl = (name: string) => config.baseUrl.replace(/\/$/, '') + config.personas[name].start;
-
-const devices = new Map<string, Device>(names.map(n => [n, parseDevice(config.personas[n].device)!]));
+const devices = new Map<string, Device>();
 const out = new Set<string>(); // personas the app bounced to loginPath
+const base = config.baseUrl.replace(/\/$/, '');
+const startUrl = (name: string) => base + config.personas[name].start;
+const size = (name: string) => `${devices.get(name)!.width}×${devices.get(name)!.height}`;
+const pad = (s: string, n = 10) => s.padEnd(n);
+
+// terminal pane: every action as the CLI line it stands for. Result lines also go to stdout, `# …` notes do not.
+type Line = [cls: string, text: string];
+const history: Line[] = [];
+function log(cmd: string | null, lines: Line[] = []) {
+  if (!cmd?.startsWith('#')) for (const [c, t] of lines) (c === 'bad' ? console.error : console.log)(t);
+  const all: Line[] = cmd ? [['cmd', '$ ' + cmd], ...lines] : lines;
+  history.push(...all);
+  if (ready) win.webContents.send('nstack:log', all);
+}
+
+const sendState = () => ready && win.webContents.send('nstack:state', {
+  space, tile, personas: names.map(n => ({ name: n, device: config.personas[n].device, width: devices.get(n)!.width, height: devices.get(n)!.height, out: out.has(n) })),
+});
 
 function layout() {
-  const all = space === 'all';
+  const all = space === 'all', sizes = names.map(n => devices.get(n)!);
   // hidden views keep their single-space size so their thumbnails render at a real size
-  const single = names.map(n => fitFrames([inset(stage, 16)], [devices.get(n)!])[0]);
-  const frames = all ? fitFrames(tileGrid(stage, names.length, 16), names.map(n => devices.get(n)!), true) : single;
+  const frames = !all ? sizes.map(d => fitFrames([inset(stage, 16)], [d])[0])
+    : tile === 'row' ? rowFrames(stage, sizes, 16)
+    : fitFrames(tileGrid(stage, names.length, 16), sizes, true);
   names.forEach((name, i) => {
     const v = views.get(name)!, f = frames[i];
     v.setBounds(f.view);
-    v.setVisible((all || name === space) && !out.has(name));
+    v.setVisible((all || name === space) && !out.has(name) && !covered);
     emulate(v.webContents, devices.get(name)!, f.scale);
   });
-  win.webContents.send('nstack:frames', names.map((name, i) => {
-    const d = devices.get(name)!;
-    return { name, device: config.personas[name].device, size: `${d.width}×${d.height}`, rect: frames[i].frame, shown: all || name === space, out: out.has(name) };
-  }));
+  win.webContents.send('nstack:frames', names.map((name, i) => ({
+    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, shown: all || name === space, out: out.has(name),
+  })));
 }
 
 function goTo(id: string) {
-  if (!spaces.includes(id)) return;
+  if (!spaces().includes(id)) return;
+  if (id !== space) log(`# space → ${id === 'all' ? 'All' : `${id}  ${config.personas[id].device} ${size(id)}`}`);
   space = id;
   layout();
+  sendState();
   win.setTitle(`nstack · ${id === 'all' ? 'All' : id}`);
-  win.webContents.send('nstack:space', id);
-  (id === 'all' ? win.webContents : views.get(id)!.webContents).focus();
-  try { fs.writeFileSync(stateFile, JSON.stringify({ space })); } catch {}
+  if (!covered) (id === 'all' ? win.webContents : views.get(id)!.webContents).focus();
+  saveState();
 }
 
 const onKey = (key: string) => {
-  const id = key === 'ArrowRight' ? nextSpace(spaces, space, 1) : key === 'ArrowLeft' ? nextSpace(spaces, space, -1) : spaceForKey(names, key);
+  const id = key === 'ArrowRight' ? nextSpace(spaces(), space, 1) : key === 'ArrowLeft' ? nextSpace(spaces(), space, -1) : spaceForKey(names, key);
   if (id && id !== space) goTo(id);
 };
+
+function setTile(m: string) {
+  if (m !== 'grid' && m !== 'row') return;
+  tile = m;
+  log(`# tile: ${m}`, [['dim', m === 'row' ? 'All space: one row, equal heights' : 'All space: grid, true relative sizes']]);
+  saveState();
+  if (space === 'all') { layout(); sendState(); } else goTo('all');
+}
 
 let tick = 0;
 async function thumbs() {
@@ -78,14 +113,74 @@ function watchLogin(name: string, v: WebContentsView) {
   const check = (to: string) => {
     if (!out.has(name) && loggedOut(from, to, config.baseUrl, config.loginPath)) {
       out.add(name);
-      console.error(`${name.padEnd(10)} logged out — run \`nstack login ${name}\``);
+      log(null, [['bad', `${pad(name)} logged out — run nstack login ${name}`]]);
       layout();
+      sendState();
     }
     at = to;
   };
   v.webContents.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) from = d.url; });
   v.webContents.on('did-navigate', (_e, url) => check(url));
   v.webContents.on('did-navigate-in-page', (_e, url, isMain) => { if (isMain) { from = at; check(url); } });
+}
+
+// one isolated view per persona; returns its line for the terminal
+function open(name: string): Line {
+  const d = parseDevice(config.personas[name].device)!;
+  devices.set(name, d);
+  const v = new WebContentsView({
+    webPreferences: { partition: `persist:${name}`, preload: path.join(__dirname, 'persona-preload.js'), backgroundThrottling: false },
+  });
+  v.setVisible(false);
+  if (d.userAgent) v.webContents.setUserAgent(d.userAgent);
+  keepSessionCookies(v.webContents);
+  watchLogin(name, v);
+  win.contentView.addChildView(v);
+  v.webContents.on('did-fail-load', (_e, code, desc, url, isMain) => {
+    if (isMain && code !== -3) log(null, [['bad', `${pad(name)} could not load ${url}: ${desc}`]]);
+  });
+  // the DevTools protocol needs a live page to answer, so emulate on a blank one, then go
+  v.webContents.loadURL('about:blank').then(() => emulate(v.webContents, d, 1)).then(() => v.webContents.loadURL(startUrl(name))).catch(() => {})
+    .then(() => v.webContents.navigationHistory.clear()); // no Back to the blank page
+  views.set(name, v);
+  return ['', `${pad(name)} ${pad(config.personas[name].device, 9)} ${pad(size(name), 9)} → ${startUrl(name)}`];
+}
+
+const addCmd = (name: string, p: Persona) => `nstack add ${name} --device ${p.device}${p.start === '/' ? '' : ` --start ${p.start}`}`;
+
+// a persona already written to nstack.yml (by the CLI or by the + tile) gets its space
+function added(name: string, p: Persona): Line[] {
+  if (views.has(name)) throw new ConfigError(`${name} is already open`);
+  config.personas[name] = p;
+  const view = open(name);
+  names.push(name);
+  const lines: Line[] = [['dim', `added personas.${name} to ${path.basename(file)} · start ${p.start} · ${size(name)}`], view];
+  log(addCmd(name, p), lines);
+  goTo(name);
+  win.show();
+  return lines;
+}
+
+const busy = new Set<string>();
+async function logIn(name: string) {
+  if (busy.has(name)) return;
+  busy.add(name);
+  log(`nstack login ${name}`);
+  const ok = await login(config, name, (c, t) => log(null, [[c, t]]));
+  busy.delete(name);
+  if (!ok) return;
+  out.delete(name);
+  views.get(name)!.webContents.loadURL(startUrl(name)).catch(() => {});
+  layout();
+  sendState();
+}
+
+async function reset(name: string) {
+  await views.get(name)!.webContents.session.clearStorageData();
+  out.add(name);
+  log(`nstack reset ${name}`, [['dim', `${pad(name)} session deleted → run nstack login ${name}`]]);
+  layout();
+  sendState();
 }
 
 app.whenReady().then(() => {
@@ -96,34 +191,53 @@ app.whenReady().then(() => {
   });
   win.loadFile(path.join(__dirname, '..', '..', '..', 'renderer', 'index.html'));
 
-  for (const name of names) {
-    const v = new WebContentsView({
-      webPreferences: { partition: `persist:${name}`, preload: path.join(__dirname, 'persona-preload.js'), backgroundThrottling: false },
-    });
-    v.setVisible(false);
-    const d = devices.get(name)!;
-    if (d.userAgent) v.webContents.setUserAgent(d.userAgent);
-    keepSessionCookies(v.webContents);
-    watchLogin(name, v);
-    win.contentView.addChildView(v);
-    v.webContents.on('did-fail-load', (_e, code, desc, url, isMain) => {
-      if (isMain && code !== -3) console.error(`${name.padEnd(10)} could not load ${url}: ${desc}`);
-    });
-    // the DevTools protocol needs a live page to answer, so emulate on a blank one, then go
-    v.webContents.loadURL('about:blank').then(() => emulate(v.webContents, d, 1)).then(() => v.webContents.loadURL(startUrl(name))).catch(() => {})
-      .then(() => v.webContents.navigationHistory.clear()); // no Back to the blank page
-    views.set(name, v);
-    console.log(`${name.padEnd(10)} ${config.personas[name].device.padEnd(9)} ${`${d.width}×${d.height}`.padEnd(9)} → ${startUrl(name)}`);
-  }
-  console.log(`${names.length} spaces + All · showing ${space} · close the window or Ctrl+C to quit`);
+  log('nstack up', [['dim', `config ${path.basename(file)} · baseUrl ${config.baseUrl}`], ...names.map(open)]);
+  log(null, [['dim', `${names.length} spaces + All · showing ${space} · close the window or Ctrl+C to quit`]]);
 
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'package.json'), 'utf8'));
   ipcMain.on('nstack:ready', () => {
-    win.webContents.send('nstack:init', { baseUrl: config.baseUrl, personas: names.map(n => ({ name: n, device: config.personas[n].device })), space });
+    ready = true;
+    win.webContents.send('nstack:init', {
+      version: pkg.version, baseUrl: config.baseUrl, file: path.basename(file), dir: dir.replace(os.homedir(), '~'),
+      presets: Object.entries(PRESETS).map(([k, d]) => [k, d.width, d.height]),
+    });
+    win.webContents.send('nstack:log', history);
     goTo(space);
   });
   ipcMain.on('nstack:stage', (_e, r: Rectangle) => { stage = r; layout(); });
   ipcMain.on('nstack:go', (_e, id: string) => goTo(id));
   ipcMain.on('nstack:key', (_e, key: string) => onKey(key));
+  ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));
+  ipcMain.on('nstack:covered', (_e, on: boolean) => { covered = on; layout(); });
+  ipcMain.on('nstack:yml', () => win.webContents.send('nstack:yml', fs.readFileSync(file, 'utf8')));
+  ipcMain.on('nstack:chip', (_e, name: string) => { if (views.has(name)) out.has(name) ? logIn(name) : reset(name); });
+  ipcMain.on('nstack:login', (_e, name?: string) => {
+    const who = name ?? names.find(n => out.has(n));
+    if (who && views.has(who)) logIn(who);
+    else log('nstack login --all', [['ok', `all ${names.length} sessions valid, nothing to do`]]);
+  });
+  // Up: every logged-in persona back to its start page
+  ipcMain.on('nstack:up', () => {
+    for (const n of names) if (!out.has(n)) views.get(n)!.webContents.loadURL(startUrl(n)).catch(() => {});
+    log('nstack up', names.map(n => out.has(n) ? ['bad', `${pad(n)} logged out  → run nstack login ${n}`] : ['', `${pad(n)} → ${startUrl(n)}`]));
+  });
+  ipcMain.on('nstack:add', (_e, a: { name: string; device: string; start: string; login: boolean }) => {
+    try {
+      const { text, persona } = addPersona(fs.readFileSync(file, 'utf8'), a.name, { device: a.device, start: a.start }, path.basename(file));
+      fs.writeFileSync(file, text);
+      added(a.name, persona);
+      if (a.login) logIn(a.name);
+    } catch (e) {
+      log(addCmd(a.name, { device: a.device, start: a.start }), [['bad', (e as Error).message]]);
+    }
+  });
+  // `nstack add` from a terminal in this folder
+  serve(dir, msg => {
+    // the CLI already wrote nstack.yml; read the persona from there rather than trusting the socket
+    const p = typeof msg?.add === 'string' && parseConfig(fs.readFileSync(file, 'utf8'), process.env, path.basename(file)).personas[msg.add];
+    if (!p) throw new Error(`${msg?.add} is not in ${path.basename(file)}`);
+    return { lines: added(msg.add, p).map(l => l[1]) };
+  }).then(s => app.on('will-quit', () => s.close()), e => log(null, [['bad', `nstack add from a terminal will start a new shell: ${e.message}`]]));
   setInterval(thumbs, THUMB_MS);
 });
 

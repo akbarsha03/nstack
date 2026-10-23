@@ -39,13 +39,17 @@ personas:
 
 `nstack login <persona>` (or `--all`) opens a window on the persona's session at `loginPath` (default `/sign-in`); log in by hand and it closes once the app sends you elsewhere. With a `login: { fill: {selector: value}, submit: selector }` block it fills the form for you (keep passwords in `$ENV`). A persona the app bounces to `loginPath` during `nstack up` shows a "Logged out" placeholder. Apps with OTP-only login: log in by hand once; it lasts as long as the app's session. `nstack reset [persona]` forgets saved sessions. Run `login` / `reset` while `nstack up` is closed.
 
-The control bar, `shot` and `--sync` come in the next milestones.
+The control bar on top matches the mock: persona chips (red dot = logged out, click to log in; green = click to forget the session), **Up** (every persona back to its start page), **Login** (the first logged-out persona), `grid` / `row` for the All space (remembered), and the `nstack.yml` drawer (read-only). The terminal pane at the bottom echoes every action as the CLI line it stands for; click its header to collapse it.
+
+`nstack add <name> --device <preset> [--start /path]` appends a persona to `nstack.yml` and opens its space: in the shell already running in that folder (over a local socket), or in a new one. The **+** tile in the strip does the same from a dialog. The persona is appended as text, so the rest of the file, comments and alignment included, stays byte for byte as you wrote it; only a one-line `personas: {…}` map gets re-printed (comments kept, spacing may change). In `row` mode the windows share one height and shrink to fit the width; there is no sideways scroll yet.
+
+`shot` and `--sync` come in the next milestones (their buttons are shown, disabled).
 
 Linux note: on Ubuntu 24+ Chromium's sandbox needs `chrome-sandbox` to be setuid root; until then nstack runs without it and prints the one-line fix.
 
 ## Status
 
-Milestone 1 of [docs/MVP.md](docs/MVP.md): shell, spaces, thumbnails, All space, per-persona sessions.
+Milestones 1–3 of [docs/MVP.md](docs/MVP.md): shell, spaces, thumbnails, All space, per-persona sessions, device presets, login / reset, control bar, terminal pane, `nstack add`.
 
 ## npm name
 

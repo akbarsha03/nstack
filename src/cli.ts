@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { Command } from 'commander';
-import { loadConfig, ConfigError, literalPasswords, type Config } from './config.js';
+import { loadConfig, addPersona, ConfigError, literalPasswords, type Config } from './config.js';
+import { send } from './ipc.js';
 import { serveMock } from './mock.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8'));
@@ -31,7 +32,7 @@ function load(configFile: string, names: string[], env: NodeJS.ProcessEnv = proc
 }
 
 // run one of the Electron entry points in dist/src/main with the loaded config
-function launch(entry: string, payload: { config: Config; names: string[]; dir: string }) {
+function launch(entry: string, payload: { config: Config; names: string[]; dir: string; file: string; space?: string }) {
   const electron = require('electron') as unknown as string;
   const args = [path.join(__dirname, 'main', entry)];
   if (needsNoSandbox(electron)) {
@@ -48,8 +49,8 @@ program.command('up')
   .argument('[personas...]', 'persona names from nstack.yml (default: all)')
   .option('-c, --config <file>', 'config file', 'nstack.yml')
   .action((names: string[], opts: { config: string }) => {
-    const { config, all, dir } = load(opts.config, names);
-    launch('main.js', { config, names: names.length ? names : all, dir });
+    const { file, config, all, dir } = load(opts.config, names);
+    launch('main.js', { config, names: names.length ? names : all, dir, file });
   });
 
 program.command('login')
@@ -66,7 +67,7 @@ program.command('login')
     for (const at of literalPasswords(fs.readFileSync(file, 'utf8'))) {
       console.error(`warning: ${at} is a literal password in ${path.basename(file)}; use "$ENV_VAR" so it stays out of git`);
     }
-    launch('login.js', { config, names: opts.all ? all : names, dir });
+    launch('login.js', { config, names: opts.all ? all : names, dir, file });
   });
 
 program.command('reset')
@@ -75,21 +76,50 @@ program.command('reset')
   .option('-c, --config <file>', 'config file', 'nstack.yml')
   .action((names: string[], opts: { config: string }) => {
     // deleting a session needs no secrets, so unset $ENV values are fine here
-    const { all, dir } = load(opts.config, names, new Proxy(process.env, { get: (env, k: string) => env[k] ?? '' }));
+    const { all, dir } = load(opts.config, names, anyEnv);
     for (const name of names.length ? names : all) {
       fs.rmSync(partitionDir(dir, name), { recursive: true, force: true });
       console.log(`${name.padEnd(10)} session deleted → run nstack login ${name}`);
     }
   });
 
+program.command('add')
+  .description('add a persona to nstack.yml and open its space (in the running shell, or a new one)')
+  .argument('<name>', 'persona name: lowercase letters, digits, dashes')
+  .requiredOption('-d, --device <preset>', 'iphone-15, pixel-8, ipad-air, laptop, desktop or WxH')
+  .option('-s, --start <path>', 'start path, e.g. /dashboard')
+  .option('-c, --config <file>', 'config file', 'nstack.yml')
+  .action(async (name: string, opts: { device: string; start?: string; config: string }) => {
+    const { file, dir } = load(opts.config, [], anyEnv);
+    try {
+      fs.writeFileSync(file, addPersona(fs.readFileSync(file, 'utf8'), name, { device: opts.device, start: opts.start }, path.basename(file)).text);
+    } catch (e) {
+      if (!(e instanceof ConfigError)) throw e;
+      console.error(e.message);
+      process.exit(1);
+    }
+    const reply = await send(dir, { add: name }).catch((e: Error) => ({ error: e.message }));
+    if (reply?.error) {
+      console.error(`added ${name} to ${path.basename(file)}, but the running shell said: ${reply.error}`);
+      process.exit(1);
+    }
+    if (reply) return reply.lines.forEach((l: string) => console.log(l));
+    console.log(`added personas.${name} to ${path.basename(file)} · no shell running here, opening one`);
+    const { config, all } = load(opts.config, []);
+    launch('main.js', { config, names: all, dir, file, space: name });
+  });
+
 program.command('mock', { isDefault: true }).description('serve and open the clickable UI mock').action(serveMock);
 
-for (const cmd of ['init', 'add', 'shot']) {
+for (const cmd of ['init', 'shot']) {
   program.command(cmd, { hidden: true }).allowUnknownOption().allowExcessArguments().action(() => {
     console.error(`nstack ${cmd}: not built yet, see docs/MVP.md`);
     process.exit(1);
   });
 }
+
+// for commands that never send secrets: an unset $ENV reads as empty instead of failing
+const anyEnv = new Proxy(process.env, { get: (env, k: string) => env[k] ?? '' });
 
 // where Electron keeps `persist:<name>` under the userData that main.ts / login.ts set
 const partitionDir = (dir: string, name: string) => path.join(dir, '.nstack', 'electron', 'Partitions', name);
