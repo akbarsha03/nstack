@@ -1,0 +1,14 @@
+# Dogfood: Nidhi Stack (Rails + Devise, OTP sign-in) on bin/dev.
+# OTP has no form to script, so each persona logs in by hand once: nstack login --all
+baseUrl: http://localhost:3000
+loginPath: /sign-in
+personas:
+  admin:
+    device: desktop
+    start: /dashboard
+  storage:
+    device: pixel-8              # the floor worker's phone
+    start: /storage/search
+  collections:
+    device: ipad-air             # the calling team's tablet
+    start: /collections

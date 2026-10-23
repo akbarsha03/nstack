@@ -1,7 +1,22 @@
 {
-  "name": "nstack",
-  "version": "0.1.0-dev",
+  "name": "@akbarsha03/nstack",
+  "version": "0.1.0",
   "description": "Open your web app as several users at several screen sizes, side by side, already logged in.",
+  "keywords": [
+    "electron",
+    "responsive",
+    "multi-user",
+    "personas",
+    "devtools",
+    "sessions",
+    "screenshots"
+  ],
+  "homepage": "https://github.com/akbarsha03/nstack#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akbarsha03/nstack.git"
+  },
+  "bugs": "https://github.com/akbarsha03/nstack/issues",
   "bin": {
     "nstack": "bin/nstack.js"
   },
@@ -10,7 +25,7 @@
     "dist/src",
     "renderer",
     "mock",
-    "docs"
+    "examples"
   ],
   "scripts": {
     "build": "tsc",
@@ -31,5 +46,8 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "typescript": "^7.0.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

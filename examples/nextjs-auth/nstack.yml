@@ -1,0 +1,26 @@
+# A Next.js app with Auth.js / NextAuth and its built-in sign-in page (Credentials provider).
+# Using a custom sign-in page? Set loginPath to it and match the field names there.
+# Passwords come from the environment: export ADMIN_PASSWORD=... MEMBER_PASSWORD=...
+baseUrl: http://localhost:3000
+loginPath: /api/auth/signin
+personas:
+  admin:
+    device: laptop
+    start: /dashboard
+    login:
+      fill:
+        "input[name=username]": "admin"
+        "input[name=password]": "$ADMIN_PASSWORD"
+      submit: "button[type=submit]"
+  member:
+    device: iphone-15
+    start: /
+    login:
+      fill:
+        "input[name=username]": "member"
+        "input[name=password]": "$MEMBER_PASSWORD"
+      submit: "button[type=submit]"
+  # OAuth-only (GitHub, Google...): no login block, `nstack login visitor` and click through once
+  visitor:
+    device: ipad-air
+    start: /

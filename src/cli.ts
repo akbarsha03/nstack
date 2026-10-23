@@ -5,6 +5,7 @@ import { Command } from 'commander';
 import { loadConfig, addPersona, ConfigError, literalPasswords, type Config } from './config.js';
 import { send } from './ipc.js';
 import { serveMock } from './mock.js';
+import { init } from './init.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8'));
 const program = new Command('nstack')
@@ -43,6 +44,14 @@ function launch(entry: string, payload: { config: Config; names: string[]; dir: 
   child.on('exit', code => process.exit(code ?? 1));
   process.on('SIGINT', () => child.kill('SIGINT'));
 }
+
+program.command('init')
+  .description('write a sample nstack.yml (two personas) and add .nstack/ to .gitignore')
+  .option('-c, --config <file>', 'config file', 'nstack.yml')
+  .action((opts: { config: string }) => {
+    init(process.cwd(), opts.config).forEach(l => console.log(l));
+    console.log(`next: set baseUrl in ${opts.config}, run nstack login --all, then nstack up`);
+  });
 
 program.command('up')
   .description('open the shell with every (or the named) persona as a space')
@@ -131,13 +140,6 @@ program.command('shot')
   });
 
 program.command('mock', { isDefault: true }).description('serve and open the clickable UI mock').action(serveMock);
-
-for (const cmd of ['init']) {
-  program.command(cmd, { hidden: true }).allowUnknownOption().allowExcessArguments().action(() => {
-    console.error(`nstack ${cmd}: not built yet, see docs/MVP.md`);
-    process.exit(1);
-  });
-}
 
 // for commands that never send secrets: an unset $ENV reads as empty instead of failing
 const anyEnv = new Proxy(process.env, { get: (env, k: string) => env[k] ?? '' });
