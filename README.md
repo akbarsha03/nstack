@@ -15,7 +15,7 @@ git clone https://github.com/akbarsha03/nstack.git && cd nstack
 npm i -g . && nstack mock      # or without installing: node bin/nstack.js
 ```
 
-It serves a clickable UI mock on a free local port and opens it in your browser. `nstack --help` lists the planned commands.
+It serves a clickable UI mock on a free local port and opens it in your browser. Each persona gets its own space, one full window at a time, like macOS Mission Control: switch with the spaces strip, ← / →, `1`–`9`, or a sideways trackpad swipe; `0` shows All windows tiled; `+` adds a persona. Up, Login, Shot and Sync act like the planned commands and print what the real CLI would. `nstack --help` lists the planned commands.
 
 <!-- screenshot: docs/mock.png -->
 
