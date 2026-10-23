@@ -6,17 +6,34 @@
 <title>nstack</title>
 <!-- look and copy from mock/index.html (the approved design reference) -->
 <style>
-:root{--bg:#0c0f13;--panel:#13181f;--panel2:#1a212a;--line:#252e39;--text:#d6dce3;--dim:#7c8792;--acc:#5eead4;--ok:#4ade80;
+:root{--bg:#0c0f13;--panel:#13181f;--panel2:#1a212a;--line:#252e39;--text:#d6dce3;--dim:#7c8792;--acc:#5eead4;--ok:#4ade80;--bad:#f87171;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--text);font:13px/1.4 var(--sans);display:flex;flex-direction:column;overflow:hidden}
 button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:4px 10px;cursor:pointer}
 button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
-.top{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex:none}
+button:hover{border-color:#3b4756}
+button:disabled{opacity:.45;cursor:default;border-color:var(--line)}
+button.on{border-color:var(--acc);color:var(--acc)}
+.primary{background:var(--acc);border-color:var(--acc);color:#04201b;font-weight:600}
+.primary:hover{border-color:#fff}
+.top{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap;flex:none}
 .brand{font:700 15px var(--mono);color:var(--acc);letter-spacing:-.5px}
 .brand small{color:var(--dim);font-weight:400;font-size:11px;margin-left:4px}
 .base{font:12px var(--mono);background:var(--bg);border:1px solid var(--line);padding:4px 8px;border-radius:5px;color:var(--dim)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:12px var(--mono);display:flex;align-items:center;gap:6px;border-radius:99px;padding:3px 10px}
+.chip.out{color:var(--bad)}
+.chip.out .dot{background:var(--bad);box-shadow:0 0 6px var(--bad)}
+.sep{width:1px;height:20px;background:var(--line)}
+.grow{flex:1}
+.seg{display:flex}
+.seg button{border-radius:0;font-family:var(--mono);font-size:12px}
+.seg button:first-child{border-radius:5px 0 0 5px}
+.seg button:last-child{border-radius:0 5px 5px 0;margin-left:-1px}
+.seg.off button{opacity:.45}
+.ymlbtn{font:11px var(--mono);color:var(--dim)}
 .spaces{display:flex;gap:6px;padding:8px 14px;background:#0f1318;border-bottom:1px solid var(--line);overflow-x:auto;flex:none;align-items:flex-end}
 .sp{display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 8px;border-radius:8px;background:none;border:1px solid transparent;flex:none}
 .sp:hover{background:var(--panel)}
@@ -24,13 +41,13 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
 .mini{height:62px;min-width:62px;overflow:hidden;border-radius:4px;background:#fff;box-shadow:0 0 0 1px var(--line);display:block}
 .sp.cur .mini{box-shadow:0 0 0 2px var(--acc)}
 .allmini{display:flex;gap:4px;align-items:center;justify-content:center;padding:0 8px;background:var(--panel2)}
-.allmini i{background:#64748b;border-radius:2px;width:22px;height:30px}
+.allmini i{background:#64748b;border-radius:2px;flex:none}
+.sp.add .mini{width:62px;display:grid;place-items:center;font-size:26px;color:var(--dim);background:none;box-shadow:none;border:1px dashed #3b4756}
 .sp-l{display:flex;align-items:center;gap:5px;font:11px var(--mono);white-space:nowrap}
 .sp-l small{color:var(--dim)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);flex:none}
 .keys{margin-left:auto;align-self:center;font:11px var(--mono);color:var(--dim);white-space:nowrap;padding-left:12px}
 main{flex:1}
-:root{--bad:#f87171}
 .sp.out .dot{background:var(--bad);box-shadow:0 0 6px var(--bad)}
 .sp.out .mini{opacity:.35}
 /* persona frames; the page itself is a native view main.ts lays over the area under .bar */
@@ -44,16 +61,90 @@ main{flex:1}
 .lo{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:.6em;background:#f8fafc;color:#475569;font:clamp(8px,3.6cqw,16px)/1.4 var(--mono);padding:8px}
 .lo b{font-size:3.5em;color:#cbd5e1;line-height:1}
 .lo code{white-space:nowrap;background:#0f172a;color:var(--acc);padding:.3em .7em;border-radius:7px}
+.lo .lb{cursor:pointer;font:1.1em var(--sans);background:#0f172a;color:#fff;border:0;border-radius:10px;padding:.6em 1.1em;margin-top:.3em}
+
+/* terminal */
+.term{background:#07090c;border-top:1px solid var(--line);font:12px/1.55 var(--mono);flex:none}
+.th{display:flex;align-items:center;gap:8px;padding:4px 14px;color:var(--dim);cursor:pointer;user-select:none;border:0;background:none;width:100%;text-align:left;border-radius:0}
+.th:hover{color:var(--text)}
+.th .caret{transition:transform .2s}
+.term.closed .caret{transform:rotate(-90deg)}
+.log{height:150px;overflow:auto;padding:4px 14px 10px;white-space:pre;border-top:1px solid var(--line)}
+.term.closed .log{display:none}
+.l-cmd{color:var(--acc);margin-top:6px}
+.l-ok{color:var(--ok)}.l-bad{color:var(--bad)}.l-dim{color:var(--dim)}
+
+/* add dialog, yml drawer */
+.scrim{position:fixed;inset:0;background:#000b;display:none;z-index:10;padding:24px;overflow:auto}
+.scrim.open{display:flex}
+.modal{margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;width:min(420px,100%);padding:22px}
+.modal h2{margin:0 0 4px;font-size:17px}
+.modal p{margin:0 0 16px;color:var(--dim)}
+.modal code{font-family:var(--mono);color:var(--acc)}
+.fake{background:#fff;color:#1e293b;border-radius:8px;padding:18px}
+.fake label{display:block;font-size:12px;color:#64748b;margin:0 0 4px}
+.fake input,.fake select{width:100%;font:14px var(--sans);padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;background:#fff;color:#1e293b}
+.fake .ck{display:flex;align-items:center;gap:8px;font-size:14px;color:#1e293b;margin:0}
+.fake .ck input{width:auto;margin:0}
+.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,92vw);background:var(--panel);border-left:1px solid var(--line);z-index:11;
+  transform:translateX(105%);transition:transform .25s;display:flex;flex-direction:column;box-shadow:-10px 0 30px #0008}
+.drawer.open{transform:none}
+.drawer .dh{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font:13px var(--mono)}
+.drawer pre{margin:0;padding:14px;overflow:auto;font:12px/1.6 var(--mono);flex:1}
+.y-c{color:var(--dim)}.y-k{color:#93c5fd}.y-s{color:#fcd34d}
+@media (max-width:900px){.top .base,.keys{display:none}}
 </style>
 </head>
 <body>
 <div class="top">
-  <span class="brand">nstack</span>
+  <span class="brand">nstack<small id="ver"></small></span>
   <span class="base" id="base" title="baseUrl from nstack.yml"></span>
+  <span class="sep"></span>
+  <div class="chips" id="chips"></div>
+  <span class="grow"></span>
+  <button class="primary" id="b-up" title="nstack up">Up</button>
+  <button id="b-login" title="nstack login">Login</button>
+  <button id="b-shot" title="nstack shot · coming in the next milestone" disabled>Shot</button>
+  <button id="b-sync" title="nstack up --sync · coming in a later milestone" aria-pressed="false" disabled>Sync</button>
+  <div class="seg" role="group" aria-label="tile mode (All space)" title="tile mode, applies in the All space">
+    <button data-tile="grid">grid</button><button data-tile="row">row</button>
+  </div>
+  <span class="sep"></span>
+  <button class="ymlbtn" id="b-yml">nstack.yml</button>
 </div>
 <nav class="spaces" id="spaces" aria-label="Spaces"></nav>
 <main id="stage"></main>
+<div class="term" id="term">
+  <button class="th" id="b-term"><span class="caret">&#9662;</span> terminal <span class="grow"></span><span id="dir"></span></button>
+  <div class="log" id="log" aria-live="polite"></div>
+</div>
 <div id="frames"></div>
+
+<div class="scrim" id="addsp" role="dialog" aria-modal="true" aria-labelledby="ad-h">
+  <form class="modal" id="ad-form">
+    <h2 id="ad-h">Add space</h2>
+    <p>Adds a persona to <code class="yml-name">nstack.yml</code> and opens its window in a new space.</p>
+    <div class="fake">
+      <label for="ad-name">Name</label>
+      <input id="ad-name" required pattern="[a-z][a-z0-9\-]{0,15}" placeholder="cashier" autocomplete="off" title="lowercase letters, digits, dashes">
+      <label for="ad-dev">Device preset</label>
+      <select id="ad-dev"></select>
+      <label for="ad-path">Start path</label>
+      <input id="ad-path" required pattern="/.*" title="a path starting with /">
+      <label class="ck"><input type="checkbox" id="ad-in" checked> Log in now (save session)</label>
+    </div>
+    <div class="actions">
+      <button type="button" data-close>Cancel</button>
+      <button type="submit" class="primary">Add space</button>
+    </div>
+  </form>
+</div>
+
+<aside class="drawer" id="yml" aria-label="nstack.yml">
+  <div class="dh"><span class="grow yml-name">nstack.yml</span><button data-close>Close</button></div>
+  <pre id="yml-pre"></pre>
+</aside>
 <script src="shell.js"></script>
 </body>
 </html>

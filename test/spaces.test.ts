@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tileGrid, nextSpace, spaceForKey, fitFrames, BAR } from '../src/main/spaces.js';
+import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, BAR } from '../src/main/spaces.js';
 
 test('grid tiles 3 personas as 2x2 inside the stage', () => {
   const r = tileGrid({ x: 0, y: 100, width: 1000, height: 600 }, 3);
@@ -47,4 +47,18 @@ test('All grid: one shared scale so relative sizes stay honest', () => {
   assert.equal(f[0].scale, f[1].scale);
   assert.ok(f[0].view.width / f[1].view.width > 3.6);
   for (const [i, x] of f.entries()) assert.ok(x.frame.x >= cells[i].x && x.frame.x + x.frame.width <= cells[i].x + cells[i].width);
+});
+
+test('All row: one row, equal heights, fits the stage width', () => {
+  const stage = { x: 0, y: 50, width: 1200, height: 800 };
+  const f = rowFrames(stage, [{ width: 1440, height: 900 }, { width: 412, height: 915 }, { width: 820, height: 1180 }]);
+  assert.equal(new Set(f.map(x => x.view.height)).size, 1);
+  assert.ok(f.every(x => x.frame.y === f[0].frame.y && x.view.y === x.frame.y + BAR));
+  for (let i = 1; i < f.length; i++) assert.ok(f[i].frame.x >= f[i - 1].frame.x + f[i - 1].frame.width);
+  const last = f[f.length - 1].frame;
+  assert.ok(f[0].frame.x >= 8 && last.x + last.width <= 1200 - 8);
+  assert.ok(Math.abs(f[1].view.width / f[1].view.height - 412 / 915) < 0.01);
+  // a short stage: height is the limit, never upscaled past the smallest device
+  const [one] = rowFrames({ x: 0, y: 0, width: 5000, height: 5000 }, [{ width: 393, height: 852 }]);
+  assert.equal(one.view.height, 852);
 });
