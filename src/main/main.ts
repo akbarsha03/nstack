@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app, BrowserWindow, WebContentsView, ipcMain, type Rectangle } from 'electron';
 import type { Config } from '../config.js';
-import { tileGrid, nextSpace, spaceForKey } from './spaces.js';
+import { parseDevice, type Device } from '../devices.js';
+import { tileGrid, nextSpace, spaceForKey, fitFrames, inset } from './spaces.js';
+import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 
 const { config, names, dir } = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string };
 const nstackDir = path.join(dir, '.nstack');
@@ -22,20 +24,24 @@ let stage: Rectangle = { x: 0, y: 0, width: 0, height: 0 };
 const views = new Map<string, WebContentsView>();
 const startUrl = (name: string) => config.baseUrl.replace(/\/$/, '') + config.personas[name].start;
 
+const devices = new Map<string, Device>(names.map(n => [n, parseDevice(config.personas[n].device)!]));
+const out = new Set<string>(); // personas the app bounced to loginPath
+
 function layout() {
-  if (space === 'all') {
-    tileGrid(stage, names.length).forEach((r, i) => {
-      const v = views.get(names[i])!;
-      v.setBounds(r);
-      v.setVisible(true);
-    });
-  } else {
-    // hidden views keep full-stage bounds so their thumbnails render at a real size
-    for (const [name, v] of views) {
-      v.setBounds(stage);
-      v.setVisible(name === space);
-    }
-  }
+  const all = space === 'all';
+  // hidden views keep their single-space size so their thumbnails render at a real size
+  const single = names.map(n => fitFrames([inset(stage, 16)], [devices.get(n)!])[0]);
+  const frames = all ? fitFrames(tileGrid(stage, names.length, 16), names.map(n => devices.get(n)!), true) : single;
+  names.forEach((name, i) => {
+    const v = views.get(name)!, f = frames[i];
+    v.setBounds(f.view);
+    v.setVisible((all || name === space) && !out.has(name));
+    emulate(v.webContents, devices.get(name)!, f.scale);
+  });
+  win.webContents.send('nstack:frames', names.map((name, i) => {
+    const d = devices.get(name)!;
+    return { name, device: config.personas[name].device, size: `${d.width}×${d.height}`, rect: frames[i].frame, shown: all || name === space, out: out.has(name) };
+  }));
 }
 
 function goTo(id: string) {
@@ -59,7 +65,7 @@ async function thumbs() {
   for (const [name, v] of views) {
     // the visible persona is skipped most ticks; only spaces you can't see need a live preview
     if (name === space && tick % 5) continue;
-    if (v.getBounds().width === 0) continue;
+    if (v.getBounds().width === 0 || out.has(name)) continue;
     try {
       const img = await v.webContents.capturePage(undefined, { stayHidden: true });
       if (!img.isEmpty()) win.webContents.send('nstack:thumb', name, img.resize({ height: 124 }).toDataURL());
@@ -67,18 +73,19 @@ async function thumbs() {
   }
 }
 
-// Chromium drops cookies without an expiry on quit, which would log out e.g. a default Rails session on every
-// restart. Give them 30 days so "log in once" holds; the app can still clear them by logging out.
-function keepSessionCookies(v: WebContentsView) {
-  const { cookies } = v.webContents.session;
-  cookies.on('changed', (_e, c, _cause, removed) => {
-    if (removed || !c.session || !c.domain) return;
-    cookies.set({
-      url: `http${c.secure ? 's' : ''}://${c.domain.replace(/^\./, '')}${c.path ?? '/'}`,
-      name: c.name, value: c.value, domain: c.hostOnly ? undefined : c.domain, path: c.path,
-      secure: c.secure, httpOnly: c.httpOnly, sameSite: c.sameSite, expirationDate: Date.now() / 1000 + 30 * 86400,
-    }).catch(() => {});
-  });
+function watchLogin(name: string, v: WebContentsView) {
+  let from = startUrl(name), at = from;
+  const check = (to: string) => {
+    if (!out.has(name) && loggedOut(from, to, config.baseUrl, config.loginPath)) {
+      out.add(name);
+      console.error(`${name.padEnd(10)} logged out — run \`nstack login ${name}\``);
+      layout();
+    }
+    at = to;
+  };
+  v.webContents.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) from = d.url; });
+  v.webContents.on('did-navigate', (_e, url) => check(url));
+  v.webContents.on('did-navigate-in-page', (_e, url, isMain) => { if (isMain) { from = at; check(url); } });
 }
 
 app.whenReady().then(() => {
@@ -94,14 +101,19 @@ app.whenReady().then(() => {
       webPreferences: { partition: `persist:${name}`, preload: path.join(__dirname, 'persona-preload.js'), backgroundThrottling: false },
     });
     v.setVisible(false);
-    keepSessionCookies(v);
+    const d = devices.get(name)!;
+    if (d.userAgent) v.webContents.setUserAgent(d.userAgent);
+    keepSessionCookies(v.webContents);
+    watchLogin(name, v);
     win.contentView.addChildView(v);
     v.webContents.on('did-fail-load', (_e, code, desc, url, isMain) => {
       if (isMain && code !== -3) console.error(`${name.padEnd(10)} could not load ${url}: ${desc}`);
     });
-    v.webContents.loadURL(startUrl(name));
+    // the DevTools protocol needs a live page to answer, so emulate on a blank one, then go
+    v.webContents.loadURL('about:blank').then(() => emulate(v.webContents, d, 1)).then(() => v.webContents.loadURL(startUrl(name))).catch(() => {})
+      .then(() => v.webContents.navigationHistory.clear()); // no Back to the blank page
     views.set(name, v);
-    console.log(`${name.padEnd(10)} ${config.personas[name].device.padEnd(9)} → ${startUrl(name)}`);
+    console.log(`${name.padEnd(10)} ${config.personas[name].device.padEnd(9)} ${`${d.width}×${d.height}`.padEnd(9)} → ${startUrl(name)}`);
   }
   console.log(`${names.length} spaces + All · showing ${space} · close the window or Ctrl+C to quit`);
 

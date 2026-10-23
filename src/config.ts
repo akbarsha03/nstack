@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import YAML from 'yaml';
 import { z } from 'zod';
+import { parseDevice } from './devices.js';
 
 const urlPath = z.string().startsWith('/', 'must start with /');
 
 const Persona = z.strictObject({
-  device: z.string().default('desktop'),
+  device: z.string().refine(d => parseDevice(d), 'unknown device: use iphone-15, pixel-8, ipad-air, laptop, desktop or WxH like 1366x768').default('desktop'),
   start: urlPath.default('/'),
   login: z.strictObject({ fill: z.record(z.string(), z.string()), submit: z.string() }).optional(),
 });
@@ -64,4 +65,13 @@ export function loadConfig(file: string, env: NodeJS.ProcessEnv = process.env): 
     throw new ConfigError(`no config at ${file}. Create nstack.yml (see docs/MVP.md §5.2).`);
   }
   return parseConfig(text, env, file);
+}
+
+// login.fill values for password-looking fields that are written in the file instead of coming from $ENV
+export function literalPasswords(text: string): string[] {
+  const personas = (YAML.parse(text) ?? {}).personas ?? {};
+  return Object.entries(personas).flatMap(([name, p]: [string, any]) =>
+    Object.entries(p?.login?.fill ?? {})
+      .filter(([sel, v]) => /pass/i.test(sel) && typeof v === 'string' && !v.includes('$'))
+      .map(([sel]) => `personas.${name}.login.fill["${sel}"]`));
 }
