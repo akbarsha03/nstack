@@ -1,0 +1,25 @@
+# A Rails app with Devise (default routes). Copy to your app root, change the personas to your roles.
+# Passwords come from the environment: export ADMIN_PASSWORD=... STAFF_PASSWORD=...
+baseUrl: http://localhost:3000
+loginPath: /users/sign_in        # Devise's new_user_session_path
+personas:
+  admin:
+    device: desktop
+    start: /admin
+    login:
+      fill:
+        "input[name='user[email]']": "admin@example.com"
+        "input[name='user[password]']": "$ADMIN_PASSWORD"
+      submit: "[type=submit]"
+  staff:
+    device: pixel-8
+    start: /
+    login:
+      fill:
+        "input[name='user[email]']": "staff@example.com"
+        "input[name='user[password]']": "$STAFF_PASSWORD"
+      submit: "[type=submit]"
+  customer:
+    device: iphone-15
+    start: /
+    # no login block: run `nstack login customer` and sign in by hand once (OTP, magic link, SSO...)

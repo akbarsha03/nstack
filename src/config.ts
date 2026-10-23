@@ -64,7 +64,7 @@ export function loadConfig(file: string, env: NodeJS.ProcessEnv = process.env): 
   try {
     text = fs.readFileSync(file, 'utf8');
   } catch {
-    throw new ConfigError(`no config at ${file}. Create nstack.yml (see docs/MVP.md §5.2).`);
+    throw new ConfigError(`no config at ${file}. Run nstack init to create one.`);
   }
   return parseConfig(text, env, file);
 }

@@ -17,6 +17,12 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: the packed tarball installs and `nstack init` works
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          npm i -g "$RUNNER_TEMP"/akbarsha03-nstack-*.tgz
+          mkdir "$RUNNER_TEMP/app" && cd "$RUNNER_TEMP/app"
+          nstack --version && nstack init && grep -qx '.nstack/' .gitignore && grep -q '^baseUrl:' nstack.yml
   shot:
     # `nstack shot` and `up --sync` end to end: real Electron under xvfb against a static demo app (test/*.e2e.test.ts)
     runs-on: ubuntu-latest

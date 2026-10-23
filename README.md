@@ -1,59 +1,106 @@
 # nstack
 
-Every role-based web app has to be checked as different users on different screens: admin on a desktop, the floor worker on a phone, the customer on a tablet. Today that means incognito windows, logging in by hand and toggling DevTools device mode, every day. `nstack up` opens your app as each persona, each in its own browser window at its own device size, each already logged in from a saved session, tiled side by side on your machine. Log in once with `nstack login <persona>`, screenshot everyone with `nstack shot`, mirror navigation across windows with `--sync`. Open source, local only, no cloud.
+Open your web app as several users at several screen sizes, side by side, already logged in.
 
-## Try the mock
+Every role-based app has to be checked as different users on different screens: the admin on a desktop, the floor worker on a phone, the customer on a tablet. Today that means incognito windows, logging in by hand and toggling DevTools device mode, every day. `nstack up` opens one window with a space per persona, each at its own device size, each with its own saved login. Open source, local only, no cloud, no telemetry.
+
+![nstack: one space per persona, live thumbnails, All space, terminal pane](docs/mock.png)
+
+<sub>The approved design (`nstack mock`); the real shell matches it.</sub>
+
+## Quick start
+
+Needs Node 22.12+ and a dev server you can log in to.
 
 ```sh
-npx github:akbarsha03/nstack
+npm i -g @akbarsha03/nstack      # the command is `nstack`; pulls Electron (~200 MB) the first time
+cd ~/code/your-app
+nstack init                      # writes nstack.yml, adds .nstack/ to .gitignore
+# edit nstack.yml: baseUrl, your roles, their devices and start pages
+nstack login --all               # log in once per persona; the session is kept
+nstack up                        # every persona, side by side
 ```
 
-or
+Before the first npm release, install from source: `git clone https://github.com/akbarsha03/nstack.git && cd nstack && npm i && npm i -g .`
 
-```sh
-git clone https://github.com/akbarsha03/nstack.git && cd nstack
-npm i -g . && nstack mock      # or without installing: node bin/nstack.js
+## Config
+
+`nstack.yml` in your project root (or `-c <file>` on any command):
+
+```yaml
+baseUrl: http://localhost:3000   # required, http(s)
+loginPath: /sign-in              # default /sign-in; landing here means "logged out"
+tile: grid                       # All space: grid (default) | row
+personas:                        # at least one; names: lowercase letters, digits, dashes, max 16
+  admin:
+    device: desktop              # default desktop
+    start: /dashboard            # default /
+  storage:
+    device: pixel-8
+    start: /storage/floor
+  customer:
+    device: ipad-air
+    start: /portal
+    login:                       # optional scripted login; leave out to log in by hand
+      fill:
+        "input[name=login]": "customer@example.com"
+        "input[name=password]": "$CUSTOMER_PASSWORD"
+      submit: "button[type=submit]"
 ```
 
-It serves a clickable UI mock on a free local port and opens it in your browser. Each persona gets its own space, one full window at a time, like macOS Mission Control: switch with the spaces strip, ← / →, `1`–`9`, or a sideways trackpad swipe; `0` shows All windows tiled; `+` adds a persona. Up, Login, Shot and Sync act like the planned commands and print what the real CLI would. `nstack --help` lists the planned commands.
+| Device | Viewport | Pixel ratio | Touch, mobile user agent |
+|---|---|---|---|
+| `iphone-15` | 393×852 | 3 | yes (iOS) |
+| `pixel-8` | 412×915 | 2.625 | yes (Android) |
+| `ipad-air` | 820×1180 | 2 | yes (iPadOS) |
+| `laptop` | 1280×800 | 1 | no |
+| `desktop` | 1440×900 | 1 | no |
+| `WxH`, e.g. `1366x768` | as written | 1 | no |
 
-<!-- screenshot: docs/mock.png -->
+- `$NAME` / `${NAME}` in any value is read from the environment. An unset variable is an error, so a secret never goes out empty. A literal password in `login.fill` works but `nstack login` warns about it.
+- `login.fill` maps a CSS selector to the value typed into it; `submit` is the selector clicked afterwards.
+- Sessions (cookies, storage) live in `.nstack/` next to the config. They are real logins: keep `.nstack/` out of git (`nstack init` does that).
 
-## Run it (milestone 1)
+Ready-made configs: [Rails + Devise](examples/rails-devise/nstack.yml), [Next.js + Auth.js](examples/nextjs-auth/nstack.yml), and the one we dogfood on [Nidhi Stack](examples/nidhi-stack/nstack.yml).
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `nstack init` | Write a sample `nstack.yml` with two personas (never over an existing one) and add `.nstack/` to `.gitignore`. Electron itself comes with the npm install. |
+| `nstack login <persona>…` | Open a window on that persona's session at `loginPath`. Log in by hand (or let the `login` block fill the form); it closes once the app sends you elsewhere. |
+| `nstack login --all` | The same for every persona, one after another. |
+| `nstack up [personas…]` | Open the shell with every (or the named) persona as a space. `--sync` mirrors navigation. |
+| `nstack add <name> --device <preset> [--start /path]` | Append a persona to `nstack.yml` and open its space, in the shell already running in that folder or a new one. The rest of the file, comments included, stays as you wrote it. |
+| `nstack shot [path]` | Screenshot every persona at `path` (default: each `start`) at its real viewport size to `.nstack/shots/<persona>.png`. Uses the running shell if there is one, otherwise shoots offscreen and exits. |
+| `nstack reset [persona…]` | Forget saved sessions for every (or the named) persona. |
+| `nstack mock` | Serve the clickable UI mock in your browser (also what plain `nstack` does). |
+
+Run `login` and `reset` while `nstack up` is closed. `nstack <command> --help` lists every option.
+
+## The shell
+
+- **Spaces.** One persona fills the view, scaled to fit with its true aspect ratio; the strip shows a live thumbnail of each. Switch with a click, ← / →, `1`–`9`; `0` or `a` is the **All** space, every persona tiled (`grid` keeps relative sizes honest, `row` gives one shared height). The **+** tile adds a persona.
+- **Control bar.** Persona chips (red dot = logged out, click to log in; green = click to forget the session), **Up** (every persona back to its start page), **Login** (the first logged-out persona), **Shot**, **Sync**, `grid` / `row`, and a read-only `nstack.yml` drawer. The last space, Sync and tile mode are remembered.
+- **Terminal pane.** Echoes every action as the CLI line it stands for; click its header to collapse it.
+- **Logged out.** A persona the app bounces to `loginPath` shows a placeholder telling you to run `nstack login <persona>`.
+- **Sync** (`--sync` or the toggle). Navigate one persona to `/invoices` and the others follow, each as its own user. Only the path is replayed (no scroll or clicks); logged-out personas are skipped with a note.
+
+## Notes
+
+- **OTP, magic-link or SSO login:** leave out the `login` block and log in by hand once; the session lasts as long as your app's remember-me cookie.
+- **Linux:** on Ubuntu 24+ Chromium's sandbox needs `chrome-sandbox` to be setuid root. Until it is, nstack runs without the sandbox and prints the one-line fix.
+- **macOS / Windows:** built to work, tested so far on Linux only.
+
+## Develop
 
 ```sh
 git clone https://github.com/akbarsha03/nstack.git && cd nstack && npm i
-cd ~/code/your-app && node ~/path/to/nstack/bin/nstack.js up      # or `npm i -g .` then `nstack up`
+npm test                                   # unit tests
+NSTACK_E2E=1 node --test --test-concurrency=1 dist/test/*.e2e.test.js   # real Electron, needs a display
 ```
 
-`nstack up [personas…]` reads `nstack.yml` from the current folder (or `-c <file>`) and opens one window: one space per persona plus **All**, switched with the strip, ← / →, `1`–`9`, `0`/`a`. Each persona has its own cookies and storage, kept in `.nstack/` in your project, so a login survives restarts. Minimal config:
-
-```yaml
-baseUrl: http://localhost:3000
-personas:
-  admin:    { device: desktop, start: /dashboard }
-  customer: { device: ipad-air, start: /portal }
-```
-
-`$ENV` / `${ENV}` in any value is read from the environment. `device` is `iphone-15`, `pixel-8`, `ipad-air`, `laptop`, `desktop` (default) or a `WxH` literal like `1366x768`; each persona gets that viewport, pixel ratio, touch and user agent, scaled to fit its space.
-
-`nstack login <persona>` (or `--all`) opens a window on the persona's session at `loginPath` (default `/sign-in`); log in by hand and it closes once the app sends you elsewhere. With a `login: { fill: {selector: value}, submit: selector }` block it fills the form for you (keep passwords in `$ENV`). A persona the app bounces to `loginPath` during `nstack up` shows a "Logged out" placeholder. Apps with OTP-only login: log in by hand once; it lasts as long as the app's session. `nstack reset [persona]` forgets saved sessions. Run `login` / `reset` while `nstack up` is closed.
-
-The control bar on top matches the mock: persona chips (red dot = logged out, click to log in; green = click to forget the session), **Up** (every persona back to its start page), **Login** (the first logged-out persona), `grid` / `row` for the All space (remembered), and the `nstack.yml` drawer (read-only). The terminal pane at the bottom echoes every action as the CLI line it stands for; click its header to collapse it.
-
-`nstack add <name> --device <preset> [--start /path]` appends a persona to `nstack.yml` and opens its space: in the shell already running in that folder (over a local socket), or in a new one. The **+** tile in the strip does the same from a dialog. The persona is appended as text, so the rest of the file, comments and alignment included, stays byte for byte as you wrote it; only a one-line `personas: {…}` map gets re-printed (comments kept, spacing may change). In `row` mode the windows share one height and shrink to fit the width; there is no sideways scroll yet.
-
-`nstack shot [path]` (or **Shot**) saves every persona at its real viewport size to `.nstack/shots/<persona>.png`. `nstack up --sync` (or the **Sync** toggle, remembered) mirrors navigation: move one persona to `/invoices` and the others follow, each as its own user. Only the path is replayed (no scroll or clicks), and logged-out personas are skipped with a note in the terminal.
-
-Linux note: on Ubuntu 24+ Chromium's sandbox needs `chrome-sandbox` to be setuid root; until then nstack runs without it and prints the one-line fix.
-
-## Status
-
-Milestones 1–5 of [docs/MVP.md](docs/MVP.md): shell, spaces, thumbnails, All space, per-persona sessions, device presets, login / reset, control bar, terminal pane, `nstack add`, `nstack shot`, `--sync`.
-
-## npm name
-
-`nstack` is already taken on npm. When this ships it will publish as `@akbarsha03/nstack` (the command stays `nstack`). Not published yet.
+Spec and design: [docs/MVP.md](docs/MVP.md), [mock/index.html](mock/index.html).
 
 ## License
 
