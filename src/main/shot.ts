@@ -30,6 +30,8 @@ export async function shoot(config: Config, names: string[], dir: string, at?: s
       webPreferences: { partition: `persist:${name}`, offscreen: true, backgroundThrottling: false },
     });
     const wc = win.webContents;
+    let painted = false;
+    wc.on('paint', () => { painted = true; });
     try {
       if (d.userAgent) wc.setUserAgent(d.userAgent);
       await wc.loadURL('about:blank');
@@ -39,13 +41,15 @@ export async function shoot(config: Config, names: string[], dir: string, at?: s
       await new Promise(r => setTimeout(r, 500));
       if (wc.isLoading()) await new Promise<void>(r => wc.once('did-stop-loading', () => r()));
       if (loggedOut(url, wc.getURL(), config.baseUrl, config.loginPath)) { out.push(gone()); continue; }
-      let img = await wc.capturePage();
+      // capturing before the first frame fails (UnknownVizError under xvfb); wait for one, then retry once
+      if (!painted) await Promise.race([new Promise(r => wc.once('paint', r)), new Promise(r => setTimeout(r, 5000))]);
+      let img = await wc.capturePage().catch(() => new Promise(r => setTimeout(r, 1000)).then(() => wc.capturePage()));
       const s = img.getSize();
       if (s.width !== d.width || s.height !== d.height) img = img.resize({ width: d.width, height: d.height, quality: 'best' });
       fs.writeFileSync(file, img.toPNG());
       out.push({ name, status: 'ok', png: file, width: d.width, height: d.height, line: `${pad(name)} → ${rel}  ${d.width}×${d.height}  ${new URL(wc.getURL()).pathname}` });
     } catch (e) {
-      out.push({ name, status: 'fail', line: `${pad(name)} could not load ${url}: ${(e as Error).message}` });
+      out.push({ name, status: 'fail', line: `${pad(name)} could not shoot ${url}: ${(e as Error).message}` });
     } finally {
       win.destroy();
     }
