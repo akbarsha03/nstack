@@ -85,6 +85,9 @@ nstack.on('state', s => {
   strip();
   document.querySelectorAll('[data-tile]').forEach(b => b.classList.toggle('on', b.dataset.tile === s.tile));
   $('.seg').classList.toggle('off', space !== 'all');
+  $('#b-sync').classList.toggle('on', s.sync);
+  $('#b-sync').setAttribute('aria-pressed', s.sync);
+  $('#b-sync').textContent = s.sync ? 'Sync on' : 'Sync';
 });
 nstack.on('log', log);
 nstack.on('yml', renderYml);
@@ -136,6 +139,7 @@ document.querySelectorAll('.scrim').forEach(s => s.addEventListener('click', e =
 $('#b-up').onclick = () => nstack.send('up');
 $('#b-login').onclick = () => nstack.send('login');
 $('#b-shot').onclick = () => { $('#b-shot').disabled = true; nstack.send('shot'); };
+$('#b-sync').onclick = () => nstack.send('sync');
 $('#b-yml').onclick = () => { nstack.send('yml'); show('#yml'); };
 document.querySelectorAll('[data-tile]').forEach(b => b.onclick = () => nstack.send('tile', b.dataset.tile));
 $('#b-term').onclick = () => $('#term').classList.toggle('closed'); // #stage shrinks or grows, the observer below re-lays out

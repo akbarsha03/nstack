@@ -9,23 +9,24 @@ import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, inset } from '.
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
 import { shoot } from './shot.js';
+import { createSync } from './sync.js';
 
 type Persona = Config['personas'][string];
-const up = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string; file: string; space?: string };
+const up = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string; file: string; space?: string; sync?: boolean };
 const { config, dir, file } = up;
 const names = [...up.names]; // grows with `nstack add` / the + tile
 const nstackDir = path.join(dir, '.nstack');
 // per-project profile: each persona's `persist:<name>` partition (cookies, storage) lives under here
 app.setPath('userData', path.join(nstackDir, 'electron'));
 
-// last space and tile mode survive restarts
+// last space, tile mode and Sync survive restarts
 const stateFile = path.join(nstackDir, 'state.json');
 const saved = (() => { try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { return {}; } })();
 const spaces = () => ['all', ...names];
 let space: string = up.space ?? saved.space ?? names[0];
 if (!spaces().includes(space)) space = names[0];
 let tile: 'grid' | 'row' = saved.tile === 'grid' || saved.tile === 'row' ? saved.tile : config.tile;
-const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile })); } catch {} };
+const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on })); } catch {} };
 
 const THUMB_MS = 1500;
 let win: BrowserWindow;
@@ -40,6 +41,17 @@ const startUrl = (name: string) => base + config.personas[name].start;
 const size = (name: string) => `${devices.get(name)!.width}×${devices.get(name)!.height}`;
 const pad = (s: string, n = 10) => s.padEnd(n);
 
+const sync = createSync({
+  baseUrl: config.baseUrl,
+  on: up.sync || saved.sync === true,
+  go: (name, at) => views.get(name)!.webContents.loadURL(base + at).catch(() => {}),
+  targets: leader => names.filter(n => n !== leader).map(n => [n, out.has(n) ? `logged out, not synced — run nstack login ${n}` : undefined]),
+  report: (leader, at, results) => log(null, [['dim', `sync ${at} from ${leader}`],
+    ...results.map(([n, skip]): Line => skip ? ['bad', `${pad(n)} ${skip}`] : ['', `${pad(n)} → ${at}  (sync)`])]),
+});
+// every load main starts goes through here, so sync can tell it from the user's own navigation
+const load = (name: string, url: string) => { sync.drive(name); return views.get(name)!.webContents.loadURL(url).catch(() => {}); };
+
 // terminal pane: every action as the CLI line it stands for. Result lines also go to stdout, `# …` notes do not.
 type Line = [cls: string, text: string];
 const history: Line[] = [];
@@ -51,7 +63,7 @@ function log(cmd: string | null, lines: Line[] = []) {
 }
 
 const sendState = () => ready && win.webContents.send('nstack:state', {
-  space, tile, personas: names.map(n => ({ name: n, device: config.personas[n].device, width: devices.get(n)!.width, height: devices.get(n)!.height, out: out.has(n) })),
+  space, tile, sync: sync.on, personas: names.map(n => ({ name: n, device: config.personas[n].device, width: devices.get(n)!.width, height: devices.get(n)!.height, out: out.has(n) })),
 });
 
 function layout() {
@@ -87,6 +99,13 @@ const onKey = (key: string) => {
   if (id && id !== space) goTo(id);
 };
 
+function setSync(on: boolean) {
+  sync.set(on);
+  log(`# --sync ${on ? 'on' : 'off'}`, [['dim', on ? 'path changes now replay in every space (relative path, each keeps its own user)' : 'spaces navigate on their own']]);
+  saveState();
+  sendState();
+}
+
 function setTile(m: string) {
   if (m !== 'grid' && m !== 'row') return;
   tile = m;
@@ -119,10 +138,12 @@ function watchLogin(name: string, v: WebContentsView) {
       sendState();
     }
     at = to;
+    if (!out.has(name)) sync.navigated(name, to);
   };
   v.webContents.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) from = d.url; });
   v.webContents.on('did-navigate', (_e, url) => check(url));
   v.webContents.on('did-navigate-in-page', (_e, url, isMain) => { if (isMain) { from = at; check(url); } });
+  v.webContents.on('did-stop-loading', () => sync.stopped(name));
 }
 
 // one isolated view per persona; returns its line for the terminal
@@ -140,10 +161,10 @@ function open(name: string): Line {
   v.webContents.on('did-fail-load', (_e, code, desc, url, isMain) => {
     if (isMain && code !== -3) log(null, [['bad', `${pad(name)} could not load ${url}: ${desc}`]]);
   });
-  // the DevTools protocol needs a live page to answer, so emulate on a blank one, then go
-  v.webContents.loadURL('about:blank').then(() => emulate(v.webContents, d, 1)).then(() => v.webContents.loadURL(startUrl(name))).catch(() => {})
-    .then(() => v.webContents.navigationHistory.clear()); // no Back to the blank page
   views.set(name, v);
+  // the DevTools protocol needs a live page to answer, so emulate on a blank one, then go
+  load(name, 'about:blank').then(() => emulate(v.webContents, d, 1)).then(() => load(name, startUrl(name)))
+    .then(() => v.webContents.navigationHistory.clear()); // no Back to the blank page
   return ['', `${pad(name)} ${pad(config.personas[name].device, 9)} ${pad(size(name), 9)} → ${startUrl(name)}`];
 }
 
@@ -171,7 +192,7 @@ async function logIn(name: string) {
   busy.delete(name);
   if (!ok) return;
   out.delete(name);
-  views.get(name)!.webContents.loadURL(startUrl(name)).catch(() => {});
+  load(name, startUrl(name));
   layout();
   sendState();
 }
@@ -206,8 +227,8 @@ app.whenReady().then(() => {
   });
   win.loadFile(path.join(__dirname, '..', '..', '..', 'renderer', 'index.html'));
 
-  log('nstack up', [['dim', `config ${path.basename(file)} · baseUrl ${config.baseUrl}`], ...names.map(open)]);
-  log(null, [['dim', `${names.length} spaces + All · showing ${space} · close the window or Ctrl+C to quit`]]);
+  log('nstack up' + (sync.on ? ' --sync' : ''), [['dim', `config ${path.basename(file)} · baseUrl ${config.baseUrl}`], ...names.map(open)]);
+  log(null, [['dim', `${names.length} spaces + All · showing ${space} · sync ${sync.on ? 'on' : 'off'} · close the window or Ctrl+C to quit`]]);
 
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'package.json'), 'utf8'));
   ipcMain.on('nstack:ready', () => {
@@ -223,6 +244,7 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:go', (_e, id: string) => goTo(id));
   ipcMain.on('nstack:key', (_e, key: string) => onKey(key));
   ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));
+  ipcMain.on('nstack:sync', () => setSync(!sync.on));
   ipcMain.on('nstack:covered', (_e, on: boolean) => { covered = on; layout(); });
   ipcMain.on('nstack:yml', () => win.webContents.send('nstack:yml', fs.readFileSync(file, 'utf8')));
   ipcMain.on('nstack:chip', (_e, name: string) => { if (views.has(name)) out.has(name) ? logIn(name) : reset(name); });
@@ -233,7 +255,7 @@ app.whenReady().then(() => {
   });
   // Up: every logged-in persona back to its start page
   ipcMain.on('nstack:up', () => {
-    for (const n of names) if (!out.has(n)) views.get(n)!.webContents.loadURL(startUrl(n)).catch(() => {});
+    for (const n of names) if (!out.has(n)) load(n, startUrl(n));
     log('nstack up', names.map(n => out.has(n) ? ['bad', `${pad(n)} logged out  → run nstack login ${n}`] : ['', `${pad(n)} → ${startUrl(n)}`]));
   });
   ipcMain.on('nstack:add', (_e, a: { name: string; device: string; start: string; login: boolean }) => {
