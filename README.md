@@ -43,13 +43,13 @@ The control bar on top matches the mock: persona chips (red dot = logged out, cl
 
 `nstack add <name> --device <preset> [--start /path]` appends a persona to `nstack.yml` and opens its space: in the shell already running in that folder (over a local socket), or in a new one. The **+** tile in the strip does the same from a dialog. The persona is appended as text, so the rest of the file, comments and alignment included, stays byte for byte as you wrote it; only a one-line `personas: {…}` map gets re-printed (comments kept, spacing may change). In `row` mode the windows share one height and shrink to fit the width; there is no sideways scroll yet.
 
-`shot` and `--sync` come in the next milestones (their buttons are shown, disabled).
+`nstack shot [path]` (or **Shot**) saves every persona at its real viewport size to `.nstack/shots/<persona>.png`. `nstack up --sync` (or the **Sync** toggle, remembered) mirrors navigation: move one persona to `/invoices` and the others follow, each as its own user. Only the path is replayed (no scroll or clicks), and logged-out personas are skipped with a note in the terminal.
 
 Linux note: on Ubuntu 24+ Chromium's sandbox needs `chrome-sandbox` to be setuid root; until then nstack runs without it and prints the one-line fix.
 
 ## Status
 
-Milestones 1–3 of [docs/MVP.md](docs/MVP.md): shell, spaces, thumbnails, All space, per-persona sessions, device presets, login / reset, control bar, terminal pane, `nstack add`.
+Milestones 1–5 of [docs/MVP.md](docs/MVP.md): shell, spaces, thumbnails, All space, per-persona sessions, device presets, login / reset, control bar, terminal pane, `nstack add`, `nstack shot`, `--sync`.
 
 ## npm name
 

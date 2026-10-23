@@ -18,7 +18,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
   shot:
-    # `nstack shot` end to end: real Electron under xvfb against a static demo app (test/shot.e2e.test.ts)
+    # `nstack shot` and `up --sync` end to end: real Electron under xvfb against a static demo app (test/*.e2e.test.ts)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +28,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: xvfb-run -a node --test dist/test/shot.e2e.test.js
+      - run: xvfb-run -a node --test dist/test/*.e2e.test.js
         env:
           NSTACK_E2E: '1'

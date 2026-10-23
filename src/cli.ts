@@ -32,7 +32,7 @@ function load(configFile: string, names: string[], env: NodeJS.ProcessEnv = proc
 }
 
 // run one of the Electron entry points in dist/src/main with the loaded config
-function launch(entry: string, payload: { config: Config; names: string[]; dir: string; file: string; space?: string; path?: string }) {
+function launch(entry: string, payload: { config: Config; names: string[]; dir: string; file: string; space?: string; path?: string; sync?: boolean }) {
   const electron = require('electron') as unknown as string;
   const args = [path.join(__dirname, 'main', entry)];
   if (needsNoSandbox(electron)) {
@@ -47,10 +47,11 @@ function launch(entry: string, payload: { config: Config; names: string[]; dir: 
 program.command('up')
   .description('open the shell with every (or the named) persona as a space')
   .argument('[personas...]', 'persona names from nstack.yml (default: all)')
+  .option('--sync', 'a path change in one persona replays in the others (also the Sync toggle)')
   .option('-c, --config <file>', 'config file', 'nstack.yml')
-  .action((names: string[], opts: { config: string }) => {
+  .action((names: string[], opts: { config: string; sync?: boolean }) => {
     const { file, config, all, dir } = load(opts.config, names);
-    launch('main.js', { config, names: names.length ? names : all, dir, file });
+    launch('main.js', { config, names: names.length ? names : all, dir, file, sync: opts.sync });
   });
 
 program.command('login')
