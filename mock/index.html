@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>nstack mock</title>
+<style>
+:root{--bg:#0c0f13;--panel:#13181f;--panel2:#1a212a;--line:#252e39;--text:#d6dce3;--dim:#7c8792;--acc:#5eead4;--ok:#4ade80;--bad:#f87171;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:13px/1.4 var(--sans);display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:4px 10px;cursor:pointer}
+button:hover{border-color:#3b4756}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+button.on{border-color:var(--acc);color:var(--acc)}
+.primary{background:var(--acc);border-color:var(--acc);color:#04201b;font-weight:600}
+.primary:hover{border-color:#fff}
+
+/* control bar */
+.top{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap;flex:none}
+.brand{font:700 15px var(--mono);color:var(--acc);letter-spacing:-.5px}
+.brand small{color:var(--dim);font-weight:400;font-size:11px;margin-left:4px}
+.base{font:12px var(--mono);background:var(--bg);border:1px solid var(--line);padding:4px 8px;border-radius:5px;color:var(--dim)}
+.chips{display:flex;gap:6px}
+.chip{font:12px var(--mono);display:flex;align-items:center;gap:6px;border-radius:99px;padding:3px 10px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.chip.out .dot{background:var(--bad);box-shadow:0 0 6px var(--bad)}
+.chip.out{color:var(--bad)}
+.sep{width:1px;height:20px;background:var(--line)}
+.grow{flex:1}
+.seg{display:flex}
+.seg button{border-radius:0;font-family:var(--mono);font-size:12px}
+.seg button:first-child{border-radius:5px 0 0 5px}
+.seg button:last-child{border-radius:0 5px 5px 0;margin-left:-1px}
+.ymlbtn{font:11px var(--mono);color:var(--dim)}
+
+/* tiled windows */
+main{flex:1;overflow:auto;padding:16px;display:flex;gap:16px;align-items:flex-start;align-content:flex-start;flex-wrap:wrap;justify-content:center}
+main.row{flex-wrap:nowrap;justify-content:flex-start}
+.win{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none;box-shadow:0 10px 30px #0009;
+  opacity:0;transform:translateY(14px) scale(.97);transition:opacity .4s,transform .4s}
+.win.shown{opacity:1;transform:none}
+.bar{display:flex;align-items:flex-start;gap:8px;padding:6px 8px 4px;font:11px var(--mono);color:var(--dim)}
+.lights{display:flex;gap:5px;padding-top:3px}
+.lights i{width:9px;height:9px;border-radius:50%;background:#ff5f57}
+.lights i:nth-child(2){background:#febc2e}
+.lights i:nth-child(3){background:#28c840}
+.title b{color:var(--text);font-weight:600}
+.addr{margin:0 8px 6px;padding:3px 8px;background:var(--bg);border-radius:4px;font:11px var(--mono);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.addr b{color:var(--text);font-weight:400;transition:color .6s}
+.addr.flash b{color:var(--acc);transition:none}
+.vp{overflow:hidden;position:relative;background:#fff}
+.page{position:absolute;top:0;left:0;transform-origin:0 0;overflow:hidden;color:#1e293b;font:14px/1.45 var(--sans)}
+
+/* terminal */
+.term{background:#07090c;border-top:1px solid var(--line);font:12px/1.55 var(--mono);flex:none}
+.th{display:flex;align-items:center;gap:8px;padding:4px 14px;color:var(--dim);cursor:pointer;user-select:none;border:0;background:none;width:100%;text-align:left;border-radius:0}
+.th:hover{color:var(--text)}
+.th .caret{transition:transform .2s}
+.term.closed .caret{transform:rotate(-90deg)}
+.log{height:170px;overflow:auto;padding:4px 14px 10px;white-space:pre;border-top:1px solid var(--line)}
+.term.closed .log{display:none}
+.l-cmd{color:var(--acc);margin-top:6px}
+.l-ok{color:var(--ok)}.l-bad{color:var(--bad)}.l-dim{color:var(--dim)}
+
+/* modal, overlay, drawer */
+.scrim{position:fixed;inset:0;background:#000b;display:none;z-index:10;padding:24px;overflow:auto}
+.scrim.open{display:flex}
+.modal{margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;width:min(420px,100%);padding:22px}
+.modal h2{margin:0 0 4px;font-size:17px}
+.modal p{margin:0 0 16px;color:var(--dim)}
+.modal code,.mono{font-family:var(--mono);color:var(--acc)}
+.fake{background:#fff;color:#1e293b;border-radius:8px;padding:18px}
+.fake label{display:block;font-size:12px;color:#64748b;margin:0 0 4px}
+.fake input{width:100%;font:14px var(--sans);padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px}
+.fake .addr{margin:-18px -18px 14px;border-radius:8px 8px 0 0;background:#e2e8f0;color:#475569}
+.fake .addr b{color:#0f172a}
+.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.shots{margin:auto;display:flex;flex-direction:column;gap:16px;align-items:center}
+.shotgrid{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.shotgrid figure{margin:0;animation:snap .5s}
+.shotgrid .win{opacity:1;transform:none;pointer-events:none}
+.shotgrid figcaption{font:12px var(--mono);color:var(--acc);margin-top:6px}
+.shotgrid figcaption span{color:var(--dim);margin-left:6px}
+@keyframes snap{0%{filter:brightness(3)}100%{filter:none}}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,92vw);background:var(--panel);border-left:1px solid var(--line);z-index:11;
+  transform:translateX(105%);transition:transform .25s;display:flex;flex-direction:column;box-shadow:-10px 0 30px #0008}
+.drawer.open{transform:none}
+.drawer .dh{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font:13px var(--mono)}
+.drawer pre{margin:0;padding:14px;overflow:auto;font:12px/1.6 var(--mono);flex:1}
+.y-c{color:var(--dim)}.y-k{color:#93c5fd}.y-s{color:#fcd34d}
+
+/* fake app: admin desktop */
+.a{display:flex;height:100%;background:#f1f5f9}
+.a nav{width:220px;background:#0f172a;color:#cbd5e1;padding:22px 14px;flex:none}
+.a .logo{color:#fff;font-weight:700;font-size:17px;margin:0 8px 26px}
+.a nav a{display:block;padding:9px 12px;border-radius:6px;cursor:pointer;margin-bottom:2px}
+.a nav a:hover{background:#1e293b}
+.a nav a.cur{background:#334155;color:#fff}
+.a .main{flex:1;padding:28px 34px;overflow:hidden}
+.a h1{font-size:23px;margin:0 0 18px}
+.a h1 small{font-size:13px;color:#64748b;font-weight:400;margin-left:8px}
+.a h2{font-size:15px;margin:0 0 10px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.card{background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 1px 2px #0000000f}
+.card small{color:#64748b;display:block;margin-bottom:4px}
+.card b{font-size:25px}
+.t{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px #0000000f}
+.t th,.t td{text-align:left;padding:11px 16px;border-bottom:1px solid #e2e8f0}
+.t th{background:#f8fafc;color:#64748b;font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+.t td.r,.t th.r{text-align:right}
+.pill{font-size:12px;padding:2px 9px;border-radius:99px;background:#dcfce7;color:#166534}
+.pill.Due{background:#fef3c7;color:#92400e}
+.pill.Overdue{background:#fee2e2;color:#991b1b}
+.tb{display:flex;gap:8px;margin-bottom:14px}
+.tb span{background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 12px;color:#475569}
+.tb span.go{background:#0f172a;color:#fff;margin-left:auto}
+
+/* fake app: storage worker phone */
+.s{height:100%;display:flex;flex-direction:column;background:#eef3ff;font-size:16px}
+.sh{background:#1d4ed8;color:#fff;padding:46px 20px 18px;font-weight:700;font-size:22px}
+.sh small{display:block;font-weight:400;opacity:.8;font-size:14px}
+.sc{flex:1;padding:16px;overflow:hidden}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.tile{background:#fff;border-radius:16px;padding:18px 16px;font-weight:600;color:#1e3a8a;box-shadow:0 1px 3px #1d4ed822;min-height:112px;display:flex;flex-direction:column;justify-content:space-between}
+.tile span{font-size:30px;color:#1d4ed8}
+.tile.big span{font-size:40px;color:#1e3a8a}
+.s h3{font-size:14px;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px}
+.li{background:#fff;border-radius:12px;padding:13px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.li small{color:#64748b;display:block;font-size:13px}
+.li em{font-style:normal;font-size:13px;font-weight:600;color:#1d4ed8;white-space:nowrap}
+.bb{display:flex;background:#fff;border-top:1px solid #dbe4ff;padding:10px 0 28px;flex:none}
+.bb a{flex:1;text-align:center;color:#64748b;font-size:13px;cursor:pointer}
+.bb a i{display:block;font-style:normal;font-size:22px;line-height:1.2}
+.bb a.cur{color:#1d4ed8;font-weight:700}
+
+/* fake app: customer tablet portal */
+.c{height:100%;background:#fbfaf7;font-size:17px;color:#292524}
+.ch{display:flex;align-items:center;gap:30px;padding:26px 36px;background:#fff;border-bottom:1px solid #ece8df}
+.ch .logo{font-weight:700;color:#0f766e;font-size:20px;margin-right:auto}
+.ch a{cursor:pointer;color:#57534e;padding-bottom:4px;border-bottom:2px solid transparent}
+.ch a.cur{color:#0f766e;border-color:#0f766e;font-weight:600}
+.cc{padding:34px 36px}
+.cc h1{font-size:28px;margin:0 0 20px}
+.hero{background:#0f766e;color:#fff;border-radius:18px;padding:30px;margin-bottom:26px}
+.hero small{opacity:.85}
+.hero b{font-size:40px;display:block;margin:4px 0}
+.btn{display:inline-block;background:#fff;color:#0f766e;border-radius:9px;padding:11px 20px;font-weight:600;margin-top:14px}
+.cr{background:#fff;border:1px solid #ece8df;border-radius:14px;padding:18px 22px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.cr small{display:block;color:#78716c;font-size:14px}
+.cr .btn{margin:0;background:#0f766e;color:#fff;padding:8px 16px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kv div{background:#fff;border:1px solid #ece8df;border-radius:14px;padding:18px 22px}
+.kv small{display:block;color:#78716c;font-size:14px}
+
+/* placeholders */
+.nf{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;font:26px/1.4 var(--mono);color:#475569;padding:30px;min-height:70%}
+.nf b{font-size:80px;color:#cbd5e1;line-height:1}
+.nf.lo{height:100%;background:#f8fafc}
+.nf code{background:#0f172a;color:#5eead4;padding:6px 14px;border-radius:8px}
+.nf button{font:24px var(--sans);background:#0f172a;color:#fff;border:0;border-radius:10px;padding:14px 24px;margin-top:10px}
+@media (max-width:900px){.top .base{display:none}}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="brand">nstack<small>0.0.1-mock</small></span>
+  <span class="base" title="baseUrl from nstack.yml">http://localhost:3000</span>
+  <span class="sep"></span>
+  <div class="chips" id="chips"></div>
+  <span class="grow"></span>
+  <button class="primary" id="b-up" title="nstack up">Up</button>
+  <button id="b-login" title="nstack login">Login</button>
+  <button id="b-shot" title="nstack shot">Shot</button>
+  <button id="b-sync" title="nstack up --sync" aria-pressed="false">Sync</button>
+  <div class="seg" role="group" aria-label="tile mode">
+    <button data-tile="grid">grid</button><button data-tile="row">row</button>
+  </div>
+  <span class="sep"></span>
+  <button class="ymlbtn" id="b-yml">nstack.yml</button>
+</div>
+
+<main id="main"></main>
+
+<div class="term" id="term">
+  <button class="th" id="b-term"><span class="caret">&#9662;</span> terminal <span class="grow"></span><span>~/code/kaveri-storage</span></button>
+  <div class="log" id="log" aria-live="polite"></div>
+</div>
+
+<div class="scrim" id="login" role="dialog" aria-modal="true" aria-labelledby="lm-h">
+  <form class="modal" id="lm-form">
+    <h2 id="lm-h">Log in once</h2>
+    <p>nstack saves the session to <code id="lm-file">.nstack/customer.json</code>. Next <code>nstack up</code> opens it already logged in.</p>
+    <div class="fake">
+      <div class="addr">localhost:3000<b>/sign-in</b></div>
+      <label for="lm-email">Email</label>
+      <input id="lm-email" type="email" required autocomplete="off">
+      <label for="lm-pw">Password</label>
+      <input id="lm-pw" type="password" required placeholder="anything works">
+    </div>
+    <div class="actions">
+      <button type="button" data-close>Cancel</button>
+      <button type="submit" class="primary">Sign in &amp; save session</button>
+    </div>
+  </form>
+</div>
+
+<div class="scrim" id="shots" role="dialog" aria-modal="true" aria-label="Screenshots">
+  <div class="shots">
+    <div class="shotgrid" id="shotgrid"></div>
+    <button data-close>Close</button>
+  </div>
+</div>
+
+<aside class="drawer" id="yml" aria-label="nstack.yml">
+  <div class="dh"><span class="grow">nstack.yml</span><button data-close>Close</button></div>
+  <pre id="yml-pre"></pre>
+</aside>
+
+<script>
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const main = $('#main'), L = $('#log');
+
+// personas mirror nstack.yml in docs/MVP.md §5.2
+const P = [
+  { id: 'admin', device: 'desktop', w: 1440, h: 900, start: '/dashboard', in: true },
+  { id: 'storage', device: 'pixel-8', w: 412, h: 915, start: '/storage/floor', in: true },
+  { id: 'customer', device: 'ipad-air', w: 820, h: 1180, start: '/portal', in: false },
+];
+P.forEach(p => p.path = p.start);
+const get = id => P.find(p => p.id === id);
+const win = id => main.querySelector(`.win[data-id="${id}"]`);
+let sync = store.get('nstack.sync', '0') === '1';
+let tile = store.get('nstack.tile', 'grid');
+
+// ---------- fake app content ----------
+const INV = [
+  ['INV-2026-0412', 'Ramesh Traders', '₹18,400', 'Paid'],
+  ['INV-2026-0411', 'Lakshmi Textiles', '₹42,750', 'Due'],
+  ['INV-2026-0410', 'Anand Kumar', '₹6,200', 'Overdue'],
+  ['INV-2026-0409', 'Sri Balaji Agencies', '₹27,900', 'Paid'],
+  ['INV-2026-0408', 'Meera Iyer', '₹3,540', 'Due'],
+  ['INV-2026-0407', 'Farooq & Sons', '₹12,000', 'Overdue'],
+  ['INV-2026-0406', 'Priya Nair', '₹4,720', 'Paid'],
+];
+const CUST = [
+  ['Ramesh Traders', '98401 22314', 'B-14, B-15', '₹0'],
+  ['Lakshmi Textiles', '94443 81020', 'A-02', '₹42,750'],
+  ['Anand Kumar', '99620 45512', 'C-31', '₹6,200'],
+  ['Sri Balaji Agencies', '90030 11876', 'A-07, A-08, A-09', '₹0'],
+  ['Meera Iyer', '98840 67021', 'D-05', '₹3,540'],
+  ['Farooq & Sons', '97910 33408', 'B-22', '₹12,000'],
+];
+const pill = s => `<span class="pill ${s}">${s}</span>`;
+const card = (k, v) => `<div class="card"><small>${k}</small><b>${v}</b></div>`;
+const invTable = rows => `<table class="t"><tr><th>Invoice</th><th>Customer</th><th>Date</th><th class="r">Amount</th><th>Status</th></tr>${
+  rows.map(([n, c, a, s], i) => `<tr><td>${n}</td><td>${c}</td><td>${23 - i} Oct 2026</td><td class="r">${a}</td><td>${pill(s)}</td></tr>`).join('')}</table>`;
+const li = (t, sub, tag) => `<div class="li"><div>${t}<small>${sub}</small></div><em>${tag}</em></div>`;
+const nav = (items, cur) => items.map(([p, label, icon]) =>
+  `<a data-path="${p}" class="${p === cur ? 'cur' : ''}">${icon ? `<i>${icon}</i>` : ''}${label}</a>`).join('');
+
+const APPS = {
+  admin: {
+    nav: [['/dashboard', 'Dashboard'], ['/invoices', 'Invoices'], ['/customers', 'Customers']],
+    shell: (cur, body) => `<div class="a"><nav><div class="logo">Kaveri Storage</div>${nav(APPS.admin.nav, cur)}
+      <a>Reports</a><a>Settings</a></nav><div class="main">${body}</div></div>`,
+    pages: {
+      '/dashboard': () => `<h1>Dashboard<small>Thu, 23 Oct 2026</small></h1><div class="cards">
+        ${card('Collected this month', '₹4,82,300')}${card('Outstanding', '₹1,12,450')}${card('Units occupied', '182 / 240')}${card('Move-ins today', '6')}</div>
+        <h2>Recent invoices</h2>${invTable(INV.slice(0, 5))}`,
+      '/invoices': () => `<h1>Invoices<small>${INV.length} this week</small></h1>
+        <div class="tb"><span>All</span><span>Due</span><span>Overdue</span><span>Oct 2026</span><span class="go">+ New invoice</span></div>${invTable(INV)}`,
+      '/customers': () => `<h1>Customers<small>${CUST.length} active</small></h1><table class="t"><tr><th>Name</th><th>Phone</th><th>Units</th><th class="r">Balance</th></tr>${
+        CUST.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="r">${r[3]}</td></tr>`).join('')}</table>`,
+    },
+  },
+  storage: {
+    nav: [['/storage/floor', 'Floor', '▦'], ['/storage/moves', 'Moves', '⇅'], ['/dashboard', 'Today', '◷']],
+    shell: (cur, body) => `<div class="s">${body}<div class="bb">${nav(APPS.storage.nav, cur)}</div></div>`,
+    pages: {
+      '/storage/floor': () => `<div class="sh">Floor · Block B<small>Ravi · shift 09:00–18:00</small></div><div class="sc">
+        <div class="tiles"><div class="tile"><span>▣</span>Check in</div><div class="tile"><span>⇄</span>Move unit</div>
+        <div class="tile"><span>⌗</span>Scan QR</div><div class="tile"><span>△</span>Damage</div></div>
+        <h3>Needs attention</h3>${li('B-22 · Farooq & Sons', 'Overdue ₹12,000', 'Lock out')}${li('C-31 · Anand Kumar', 'Move-out today 12:00', 'Inspect')}${li('B-14 · Ramesh Traders', 'Padlock reported loose', 'Check')}</div>`,
+      '/storage/moves': () => `<div class="sh">Moves today<small>4 scheduled</small></div><div class="sc">
+        ${li('Move-in · D-12', 'Priya Nair · 2 helpers', '10:30')}${li('Move-out · C-31', 'Anand Kumar', '12:00')}
+        ${li('Move-in · A-11', 'Farooq & Sons · tempo', '15:30')}${li('Transfer · B-14 → B-16', 'Ramesh Traders', '17:00')}</div>`,
+      '/dashboard': () => `<div class="sh">Today<small>Thu, 23 Oct</small></div><div class="sc"><div class="tiles">
+        <div class="tile big"><span>6</span>Move-ins</div><div class="tile big"><span>2</span>Move-outs</div>
+        <div class="tile big"><span>3</span>Tasks</div><div class="tile big"><span>1</span>Damage</div></div>
+        <h3>Next up</h3>${li('Move-in · D-12', 'Priya Nair', '10:30')}</div>`,
+    },
+  },
+  customer: {
+    nav: [['/portal', 'Home'], ['/invoices', 'Invoices'], ['/portal/units', 'My units']],
+    shell: (cur, body) => `<div class="c"><div class="ch"><span class="logo">Kaveri Storage</span>${nav(APPS.customer.nav, cur)}</div><div class="cc">${body}</div></div>`,
+    pages: {
+      '/portal': () => `<h1>Namaste, Meera</h1><div class="hero"><small>Balance due · by 30 Oct</small><b>₹3,540</b>
+        INV-2026-0408 · October rent + GST<br><span class="btn">Pay with UPI</span></div>
+        <div class="kv"><div><small>Your unit</small>D-05 · Block D</div><div><small>Next invoice</small>1 Nov 2026</div></div>`,
+      '/invoices': () => `<h1>Invoices</h1>${[['0408', 'Oct', 'Due'], ['0371', 'Sep', 'Paid'], ['0334', 'Aug', 'Paid'], ['0298', 'Jul', 'Paid']].map(([n, m, s]) =>
+        `<div class="cr"><div>INV-2026-${n}<small>${m} 2026 · unit D-05</small></div><div>₹3,540</div>${s === 'Due' ? '<span class="btn">Pay</span>' : pill(s)}</div>`).join('')}`,
+      '/portal/units': () => `<h1>My units</h1><div class="kv"><div><small>Unit</small>D-05 · Block D, ground floor</div><div><small>Size</small>5 × 5 ft</div>
+        <div><small>Since</small>Mar 2025</div><div><small>Rent</small>₹3,000 + 18% GST</div><div><small>Access</small>07:00 – 21:00, all days</div><div><small>Gate PIN</small>•••• 42</div></div>`,
+    },
+  },
+};
+
+function pageHTML(p) {
+  if (!p.in) return `<div class="nf lo"><b>⊘</b>Logged out<div>run <code>nstack login ${p.id}</code></div><button data-login="${p.id}">Log in now</button></div>`;
+  const app = APPS[p.id], page = app.pages[p.path];
+  return app.shell(p.path, page ? page() : `<div class="nf"><b>404</b>No page at ${p.path}<div>for the ${p.id} role</div></div>`);
+}
+
+// ---------- windows ----------
+function build() {
+  main.innerHTML = P.map(p => `<div class="win" data-id="${p.id}">
+    <div class="bar"><span class="lights"><i></i><i></i><i></i></span><span class="title"><b>${p.id}</b> · ${p.device} · ${p.w}×${p.h}</span></div>
+    <div class="addr"></div><div class="vp"><div class="page" style="width:${p.w}px;height:${p.h}px"></div></div></div>`).join('');
+  P.forEach(p => paint(p));
+  layout();
+}
+
+function paint(p, flash) {
+  const w = win(p.id);
+  if (!w) return;
+  const addr = w.querySelector('.addr');
+  addr.innerHTML = `localhost:3000<b>${p.in ? p.path : '/sign-in'}</b>`;
+  w.querySelector('.page').innerHTML = pageHTML(p);
+  if (flash) { addr.classList.add('flash'); requestAnimationFrame(() => requestAnimationFrame(() => addr.classList.remove('flash'))); }
+}
+
+// grid: one scale for all so relative sizes stay true; row: equal heights, scroll sideways
+function layout() {
+  const avW = main.clientWidth - 32 - 16 * (P.length - 1);
+  const avH = main.clientHeight - 32 - 62;
+  const fit = Math.max(0.2, Math.min(avW / P.reduce((n, p) => n + p.w, 0), avH / Math.max(...P.map(p => p.h)), 0.7));
+  P.forEach(p => {
+    const w = win(p.id);
+    if (!w) return;
+    const s = tile === 'row' ? Math.max(0.3, Math.min(avH / p.h, 0.8)) : fit;
+    w.querySelector('.vp').style.cssText = `width:${Math.round(p.w * s)}px;height:${Math.round(p.h * s)}px`;
+    w.querySelector('.page').style.transform = `scale(${s})`;
+    w.style.width = Math.round(p.w * s) + 2 + 'px';
+  });
+}
+
+// ---------- terminal ----------
+const pad = (s, n = 10) => String(s).padEnd(n);
+function log(cmd, lines = []) {
+  if (cmd) add('cmd', '$ ' + cmd);
+  lines.forEach(([c, t]) => add(c, t));
+}
+function add(c, t) {
+  const d = document.createElement('div');
+  d.className = 'l-' + (c || 'x');
+  d.textContent = t;
+  L.appendChild(d);
+  L.scrollTop = L.scrollHeight;
+}
+
+// ---------- actions ----------
+let upTimers = [];
+function up() {
+  upTimers.forEach(clearTimeout);
+  P.forEach(p => p.path = p.start);
+  build();
+  log('nstack up' + (sync ? ' --sync' : ''), [['dim', 'config nstack.yml · baseUrl http://localhost:3000'], ['dim', `launching ${P.length} chromium windows, one per persona…`]]);
+  upTimers = P.map((p, i) => setTimeout(() => {
+    win(p.id).classList.add('shown');
+    log(null, [[p.in ? 'ok' : 'bad', `${pad(p.id)} ${pad(p.device, 9)} ${pad(p.w + '×' + p.h)} ${p.in ? 'session ok  → ' + p.start : 'logged out  → run nstack login ' + p.id}`]]);
+  }, 200 + i * 350));
+  upTimers.push(setTimeout(() => log(null, [['dim', `tiled ${tile} · sync ${sync ? 'on' : 'off'} · Ctrl+C closes all`]]), 200 + P.length * 350));
+}
+
+function go(id, path) {
+  const targets = sync ? [get(id), ...P.filter(p => p.id !== id)] : [get(id)];
+  log(null, targets.map(p => {
+    if (!p.in) return ['bad', `${pad(p.id)} logged out — run nstack login ${p.id}`];
+    p.path = path;
+    paint(p, true);
+    const has = APPS[p.id].pages[path];
+    return [has ? '' : 'dim', `${pad(p.id)} → ${path}${p.id === id ? '' : '  (sync)'}${has ? '' : '  404 for this role'}`];
+  }));
+}
+
+let loginFor = null;
+function openLogin(id) {
+  loginFor = id;
+  $('#lm-file').textContent = `.nstack/${id}.json`;
+  $('#lm-email').value = `${id}@example.com`;
+  $('#lm-pw').value = '';
+  log(`nstack login ${id}`, [['dim', `opened ${id} window at http://localhost:3000/sign-in, log in by hand…`]]);
+  show('#login');
+  setTimeout(() => $('#lm-pw').focus(), 30);
+}
+$('#lm-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const p = get(loginFor);
+  p.in = true;
+  p.path = p.start;
+  closeAll();
+  log(null, [['ok', `URL left /sign-in → session saved to .nstack/${p.id}.json (cookies + localStorage)`], ['', `${pad(p.id)} → ${p.start}`]]);
+  paint(p, true);
+  chips();
+});
+
+function reset(id) {
+  get(id).in = false;
+  log(`nstack reset ${id}`, [['dim', `deleted .nstack/${id}.json`]]);
+  paint(get(id), true);
+  chips();
+}
+
+function shot() {
+  const g = $('#shotgrid');
+  g.innerHTML = '';
+  log('nstack shot', []);
+  P.forEach(p => {
+    const f = document.createElement('figure');
+    const w = win(p.id).cloneNode(true);
+    w.classList.add('shown');
+    f.appendChild(w);
+    f.insertAdjacentHTML('beforeend', `<figcaption>.nstack/shots/${p.id}.png<span>${p.w}×${p.h}</span></figcaption>`);
+    g.appendChild(f);
+    log(null, [['ok', `${pad(p.id)} → .nstack/shots/${p.id}.png  ${p.w}×${p.h}  ${p.in ? p.path : '/sign-in (logged out)'}`]]);
+  });
+  show('#shots');
+}
+
+function setSync(on, quiet) {
+  sync = on;
+  store.set('nstack.sync', on ? '1' : '0');
+  $('#b-sync').classList.toggle('on', on);
+  $('#b-sync').setAttribute('aria-pressed', on);
+  $('#b-sync').textContent = on ? 'Sync on' : 'Sync';
+  if (!quiet) log(`# --sync ${on ? 'on' : 'off'}`, [['dim', on ? 'path changes now replay in every window (relative path, each keeps its own user)' : 'windows navigate on their own']]);
+}
+
+function setTile(m, quiet) {
+  tile = m;
+  store.set('nstack.tile', m);
+  main.classList.toggle('row', m === 'row');
+  document.querySelectorAll('[data-tile]').forEach(b => b.classList.toggle('on', b.dataset.tile === m));
+  layout();
+  if (!quiet) log(`# tile: ${m}`, [['dim', m === 'row' ? 'one row, equal heights, scroll sideways' : 'grid, true relative sizes, wraps when narrow']]);
+}
+
+function chips() {
+  $('#chips').innerHTML = P.map(p => `<button class="chip ${p.in ? '' : 'out'}" data-chip="${p.id}"
+    title="${p.in ? 'session saved · click to reset' : 'logged out · click to log in'}"><span class="dot"></span>${p.id}</button>`).join('');
+}
+
+// ---------- overlays ----------
+let lastFocus = null;
+function show(sel) { lastFocus = document.activeElement; $(sel).classList.add('open'); }
+function closeAll() {
+  document.querySelectorAll('.scrim.open, .drawer.open').forEach(el => el.classList.remove('open'));
+  if (lastFocus) lastFocus.focus();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeAll));
+document.querySelectorAll('.scrim').forEach(s => s.addEventListener('click', e => { if (e.target === s) closeAll(); }));
+
+const YML = `# nstack.yml
+baseUrl: http://localhost:3000
+loginPath: /sign-in          # used to detect "logged out"
+tile: grid                   # grid | row | none
+personas:
+  admin:
+    device: desktop          # 1440x900 @1x
+    start: /dashboard
+  storage:
+    device: pixel-8          # 412x915 @2.6, touch, mobile UA
+    start: /storage/floor
+  customer:
+    device: ipad-air
+    start: /portal
+    login:                   # optional scripted login; omit to log in by hand
+      fill:
+        "input[name=login]": "customer@example.com"
+        "input[name=password]": "$CUSTOMER_PASSWORD"   # env var
+      submit: "button[type=submit]"`;
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+$('#yml-pre').innerHTML = YML.split('\n').map(line => {
+  const m = line.match(/(^|\s)#.*$/), i = m ? m.index + m[1].length : line.length;
+  const [code, cmt] = [line.slice(0, i), line.slice(i)];
+  return esc(code).replace(/^(\s*)([\w"\[\]=.]+):/, '$1<span class="y-k">$2</span>:').replace(/("[^"]*")(\s*)$/, '<span class="y-s">$1</span>$2')
+    + (cmt ? `<span class="y-c">${esc(cmt)}</span>` : '');
+}).join('\n');
+
+// ---------- wiring ----------
+main.addEventListener('click', e => {
+  const a = e.target.closest('[data-path]'), w = e.target.closest('.win');
+  if (a && w) return go(w.dataset.id, a.dataset.path);
+  const l = e.target.closest('[data-login]');
+  if (l) openLogin(l.dataset.login);
+});
+$('#chips').addEventListener('click', e => {
+  const c = e.target.closest('[data-chip]');
+  if (c) get(c.dataset.chip).in ? reset(c.dataset.chip) : openLogin(c.dataset.chip);
+});
+$('#b-up').onclick = up;
+$('#b-shot').onclick = shot;
+$('#b-sync').onclick = () => setSync(!sync);
+$('#b-yml').onclick = () => show('#yml');
+$('#b-login').onclick = () => {
+  const out = P.find(p => !p.in);
+  out ? openLogin(out.id) : log('nstack login --all', [['ok', `all ${P.length} sessions valid, nothing to do`]]);
+};
+document.querySelectorAll('[data-tile]').forEach(b => b.onclick = () => setTile(b.dataset.tile));
+$('#b-term').onclick = () => { $('#term').classList.toggle('closed'); layout(); };
+addEventListener('resize', layout);
+
+chips();
+setSync(sync, true);
+setTile(tile, true);
+add('dim', 'nstack 0.0.1-mock · UI mock only, nothing real runs. Spec: docs/MVP.md');
+up();
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "nstack",
+  "version": "0.0.1-mock",
+  "description": "Open your web app as several users at several screen sizes, side by side, already logged in. (UI mock)",
+  "bin": {
+    "nstack": "bin/nstack.js"
+  },
+  "files": [
+    "bin",
+    "mock",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
