@@ -35,7 +35,11 @@ personas:
   customer: { device: ipad-air, start: /portal }
 ```
 
-`$ENV` / `${ENV}` in any value is read from the environment. Device sizes, login/reset, the control bar, `shot` and `--sync` come in the next milestones.
+`$ENV` / `${ENV}` in any value is read from the environment. `device` is `iphone-15`, `pixel-8`, `ipad-air`, `laptop`, `desktop` (default) or a `WxH` literal like `1366x768`; each persona gets that viewport, pixel ratio, touch and user agent, scaled to fit its space.
+
+`nstack login <persona>` (or `--all`) opens a window on the persona's session at `loginPath` (default `/sign-in`); log in by hand and it closes once the app sends you elsewhere. With a `login: { fill: {selector: value}, submit: selector }` block it fills the form for you (keep passwords in `$ENV`). A persona the app bounces to `loginPath` during `nstack up` shows a "Logged out" placeholder. Apps with OTP-only login: log in by hand once; it lasts as long as the app's session. `nstack reset [persona]` forgets saved sessions. Run `login` / `reset` while `nstack up` is closed.
+
+The control bar, `shot` and `--sync` come in the next milestones.
 
 Linux note: on Ubuntu 24+ Chromium's sandbox needs `chrome-sandbox` to be setuid root; until then nstack runs without it and prints the one-line fix.
 

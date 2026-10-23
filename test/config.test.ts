@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseConfig, ConfigError } from '../src/config.js';
+import { parseConfig, ConfigError, literalPasswords } from '../src/config.js';
 
 const OK = `
 baseUrl: http://localhost:3000
@@ -52,4 +52,16 @@ test('rejects invalid configs with readable messages', () => {
   bad('baseUrl: http://x\ntile: column\npersonas: {a: {}}', /tile/);
   bad('baseUrl: [unclosed', /not valid YAML/);
   bad('', /baseUrl/);
+  bad('baseUrl: http://x\npersonas: {a: {device: galaxy}}', /personas\.a\.device: unknown device/);
+});
+
+test('accepts presets and WxH devices', () => {
+  const c = parseConfig('baseUrl: http://x\npersonas: {a: {device: iphone-15}, b: {device: 1366x768}}', env);
+  assert.equal(c.personas.b.device, '1366x768');
+});
+
+test('flags literal passwords but not $ENV ones', () => {
+  assert.deepEqual(literalPasswords(OK), []);
+  const lit = OK.replace('"$CUSTOMER_PASSWORD"', 'hunter2');
+  assert.deepEqual(literalPasswords(lit), ['personas.customer.login.fill["input[name=password]"]']);
 });

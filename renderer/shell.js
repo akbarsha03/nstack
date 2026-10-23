@@ -27,6 +27,14 @@ nstack.on('thumb', (name, url) => {
   if (img) img.src = url;
 });
 
+// the frame (title bar = persona · device · real size) around each visible persona; logged-out ones get the placeholder
+nstack.on('frames', frames => {
+  $('#frames').innerHTML = frames.filter(f => f.shown).map(f => `<div class="frame" style="left:${f.rect.x}px;top:${f.rect.y}px;width:${f.rect.width}px;height:${f.rect.height}px">
+    <div class="bar" title="${esc(f.name)} · ${esc(f.device)} · ${esc(f.size)}"><span class="lights"><i></i><i></i><i></i></span><span><b>${esc(f.name)}</b> · ${esc(f.device)} · ${esc(f.size)}</span></div>
+    ${f.out ? `<div class="lo"><b>⊘</b>Logged out<div>run <code>nstack login ${esc(f.name)}</code></div></div>` : ''}</div>`).join('');
+  for (const f of frames) document.querySelector(`.sp[data-space="${CSS.escape(f.name)}"]`)?.classList.toggle('out', f.out);
+});
+
 $('#spaces').addEventListener('click', e => {
   const b = e.target.closest('[data-space]');
   if (b) nstack.send('go', b.dataset.space);
