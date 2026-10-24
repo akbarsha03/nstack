@@ -20,3 +20,15 @@ test('add from a terminal reaches the running shell; no shell = undefined', asyn
   assert.notEqual(socketPath(dir), socketPath(dir + '-other'));
   assert.ok(Buffer.byteLength(socketPath('/a/very/long/project/path/'.repeat(10))) < 100);
 });
+
+test('a symlink to the project finds the same socket as its real path', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nstack-ipc-'));
+  const link = dir + '-link';
+  fs.symlinkSync(dir, link);
+  try {
+    assert.equal(socketPath(link), socketPath(dir));
+    assert.equal(socketPath(link), socketPath(fs.realpathSync(dir)));
+  } finally {
+    fs.unlinkSync(link);
+  }
+});

@@ -6,7 +6,7 @@ Every role-based app has to be checked as different users on different screens: 
 
 ![nstack: one space per persona, live thumbnails, All space, terminal pane](docs/mock.png)
 
-<sub>The approved design (`nstack mock`); the real shell matches it.</sub>
+<sub>The approved design (`nstack mock`); the shell has grown past it since.</sub>
 
 ## Quick start
 

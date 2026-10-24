@@ -5,9 +5,12 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 
 // one socket per project folder, so `nstack add` finds the shell `nstack up` opened there.
-// Kept out of the project dir: a unix socket path is capped at ~104 bytes.
+// Kept out of the project dir: a unix socket path is capped at ~104 bytes. Hashes the real path, so a symlinked folder
+// (macOS /var → /private/var, where the shell's cwd comes back resolved) finds the same shell.
 export function socketPath(dir: string) {
-  const id = createHash('sha1').update(path.resolve(dir)).digest('hex').slice(0, 12);
+  let real = path.resolve(dir);
+  try { real = fs.realpathSync.native(real); } catch {}
+  const id = createHash('sha1').update(real).digest('hex').slice(0, 12);
   return process.platform === 'win32' ? `\\\\.\\pipe\\nstack-${id}` : path.join(os.tmpdir(), `nstack-${id}.sock`);
 }
 
