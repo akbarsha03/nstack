@@ -28,8 +28,9 @@ const spaces = () => ['all', ...names];
 let space: string = up.space ?? saved.space ?? names[0];
 if (!spaces().includes(space)) space = names[0];
 let shotDir: string | undefined = typeof saved.shotDir === 'string' ? saved.shotDir : undefined; // last folder the Screenshot button saved to
+let term = saved.term === true; // terminal pane open; starts collapsed
 let tile: 'grid' | 'row' = saved.tile === 'grid' || saved.tile === 'row' ? saved.tile : config.tile;
-const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs, order: names, shotDir, landscape: [...landscape] })); } catch {} };
+const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs, order: names, shotDir, landscape: [...landscape], term })); } catch {} };
 
 const THUMB_MS = 1500;
 let win: BrowserWindow;
@@ -334,7 +335,7 @@ app.whenReady().then(() => {
     ready = true;
     win.webContents.send('nstack:init', {
       version: pkg.version, baseUrl: config.baseUrl, file: path.basename(file), dir: dir.replace(os.homedir(), '~'),
-      presets: Object.entries(PRESETS).map(([k, d]) => [k, d.width, d.height]),
+      presets: Object.entries(PRESETS).map(([k, d]) => [k, d.width, d.height]), term,
     });
     win.webContents.send('nstack:log', history);
     goTo(space);
@@ -343,6 +344,7 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:go', (_e, id: string) => goTo(id));
   ipcMain.on('nstack:key', (_e, key: string) => onKey(key));
   ipcMain.on('nstack:reorder', (_e, order: string[]) => setOrder(order));
+  ipcMain.on('nstack:term', (_e, open: boolean) => { term = open === true; saveState(); });
   ipcMain.on('nstack:reload', (_e, name: string) => reload([name]));
   ipcMain.on('nstack:rotate', (_e, name: string) => rotate(name));
   ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));

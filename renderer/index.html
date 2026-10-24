@@ -98,6 +98,7 @@ main{flex:1;position:relative}
 .term.closed .caret{transform:rotate(-90deg)}
 .log{height:150px;overflow:auto;padding:4px 14px 10px;white-space:pre;border-top:1px solid var(--line)}
 .term.closed .log{display:none}
+.unread{font-size:10px;color:#04201b;background:var(--acc);border-radius:99px;padding:0 6px}
 .l-cmd{color:var(--acc);margin-top:6px}
 .l-ok{color:var(--ok)}.l-bad{color:var(--bad)}.l-dim{color:var(--dim)}
 
@@ -165,8 +166,8 @@ main{flex:1;position:relative}
 </div>
 <nav class="spaces" id="spaces" aria-label="Spaces"></nav>
 <main id="stage"><button class="nav" id="b-prev" title="Previous space (←)" aria-label="Previous space">‹</button><button class="nav" id="b-next" title="Next space (→)" aria-label="Next space">›</button></main>
-<div class="term" id="term">
-  <button class="th" id="b-term"><span class="caret">&#9662;</span> terminal <span class="grow"></span><span id="dir"></span></button>
+<div class="term closed" id="term">
+  <button class="th" id="b-term"><span class="caret">&#9662;</span> terminal <span class="unread" id="unread" hidden></span><span class="grow"></span><span id="dir"></span></button>
   <div class="log" id="log" aria-live="polite"></div>
 </div>
 <div id="frames"></div>

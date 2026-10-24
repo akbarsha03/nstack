@@ -32,6 +32,11 @@ function strip() {
   document.querySelector('.sp.cur')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+let unread = 0;
+function setTerm(open) {
+  $('#term').classList.toggle('closed', !open);
+  if (open) { unread = 0; $('#unread').hidden = true; $('#log').scrollTop = $('#log').scrollHeight; }
+}
 function log(lines) {
   const L = $('#log');
   for (const [c, t] of lines) {
@@ -41,6 +46,8 @@ function log(lines) {
     L.appendChild(d);
   }
   L.scrollTop = L.scrollHeight;
+  // collapsed: count what arrived instead of opening
+  if ($('#term').classList.contains('closed')) { unread += lines.length; $('#unread').textContent = unread; $('#unread').hidden = false; }
 }
 
 // same highlighting as the mock's drawer
@@ -89,6 +96,7 @@ function openPrefs() {
 }
 
 nstack.on('init', s => {
+  setTerm(s.term);
   $('#ver').textContent = s.version;
   $('#base').textContent = s.baseUrl;
   $('#dir').textContent = s.dir;
@@ -283,7 +291,8 @@ $('#b-sync').onclick = () => nstack.send('sync');
 $('#b-syncprefs').onclick = openPrefs;
 $('#b-yml').onclick = () => { nstack.send('yml'); show('#yml'); };
 document.querySelectorAll('[data-tile]').forEach(b => b.onclick = () => nstack.send('tile', b.dataset.tile));
-$('#b-term').onclick = () => $('#term').classList.toggle('closed'); // #stage shrinks or grows, the observer below re-lays out
+// #stage shrinks or grows, the observer below re-lays out; main remembers the choice
+$('#b-term').onclick = () => { const open = $('#term').classList.contains('closed'); setTerm(open); nstack.send('term', open); };
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') return closeMenu(), closeAll();
