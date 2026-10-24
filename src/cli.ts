@@ -46,7 +46,7 @@ function launch(entry: string, payload: { config: Config; names: string[]; dir: 
 }
 
 program.command('init')
-  .description('write a sample nstack.yml (two personas) and add .nstack/ to .gitignore')
+  .description('write a sample nstack.yml (one space) and add .nstack/ to .gitignore')
   .option('-c, --config <file>', 'config file', 'nstack.yml')
   .action((opts: { config: string }) => {
     init(process.cwd(), opts.config).forEach(l => console.log(l));
@@ -97,12 +97,11 @@ program.command('add')
   .description('add a persona to nstack.yml and open its space (in the running shell, or a new one)')
   .argument('<name>', 'persona name: lowercase letters, digits, dashes')
   .requiredOption('-d, --device <preset>', 'iphone-15, pixel-8, ipad-air, laptop, desktop or WxH')
-  .option('-s, --start <path>', 'start path, e.g. /dashboard')
   .option('-c, --config <file>', 'config file', 'nstack.yml')
-  .action(async (name: string, opts: { device: string; start?: string; config: string }) => {
+  .action(async (name: string, opts: { device: string; config: string }) => {
     const { file, dir } = load(opts.config, [], anyEnv);
     try {
-      fs.writeFileSync(file, addPersona(fs.readFileSync(file, 'utf8'), name, { device: opts.device, start: opts.start }, path.basename(file)).text);
+      fs.writeFileSync(file, addPersona(fs.readFileSync(file, 'utf8'), name, { device: opts.device }, path.basename(file)).text);
     } catch (e) {
       if (!(e instanceof ConfigError)) throw e;
       console.error(e.message);
@@ -140,7 +139,7 @@ program.command('remove')
   });
 
 program.command('shot')
-  .description('screenshot every persona at path (default: each start) into a new run folder under .nstack/shots')
+  .description('screenshot every persona at path (default: /) into a new run folder under .nstack/shots')
   .argument('[path]', 'app path, e.g. /invoices')
   .option('-c, --config <file>', 'config file', 'nstack.yml')
   .action(async (at: string | undefined, opts: { config: string }) => {

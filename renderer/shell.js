@@ -67,7 +67,6 @@ function openAdd() {
   $('#ad-name').value = '';
   $('#ad-name').setCustomValidity('');
   $('#ad-dev').value = 'iphone-15';
-  $('#ad-path').value = '/';
   $('#ad-in').checked = true;
   show('#addsp');
   setTimeout(() => $('#ad-name').focus(), 30);
@@ -205,7 +204,7 @@ $('#spaces').addEventListener('dragend', () => { dragging = null; clearDrop(); }
 $('#ad-name').addEventListener('input', e => e.target.setCustomValidity(['all', ...personas.map(p => p.name)].includes(e.target.value.trim()) ? 'that space already exists' : ''));
 $('#ad-form').addEventListener('submit', e => {
   e.preventDefault();
-  const add = { name: $('#ad-name').value.trim(), device: $('#ad-dev').value, start: $('#ad-path').value.trim(), login: $('#ad-in').checked };
+  const add = { name: $('#ad-name').value.trim(), device: $('#ad-dev').value, login: $('#ad-in').checked };
   closeAll();
   nstack.send('add', add);
 });
@@ -219,7 +218,6 @@ document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click
 document.querySelectorAll('.scrim').forEach(s => s.addEventListener('click', e => { if (e.target === s) closeAll(); }));
 $('#b-prev').onclick = () => nstack.send('key', 'ArrowLeft');
 $('#b-next').onclick = () => nstack.send('key', 'ArrowRight');
-$('#b-up').onclick = () => nstack.send('up');
 $('#b-login').onclick = () => nstack.send('login');
 $('#b-shot').onclick = () => { $('#b-shot').disabled = true; nstack.send('shot'); };
 $('#b-sync').onclick = () => nstack.send('sync');

@@ -15,8 +15,8 @@ Needs Node 22.12+ and a dev server you can log in to.
 ```sh
 npm i -g @akbarsha03/nstack      # the command is `nstack`; pulls Electron (~200 MB) the first time
 cd ~/code/your-app
-nstack init                      # writes nstack.yml, adds .nstack/ to .gitignore
-# edit nstack.yml: baseUrl, your roles, their devices and start pages
+nstack init                      # writes nstack.yml (one space), adds .nstack/ to .gitignore
+# edit nstack.yml: baseUrl and your first space's device (add more spaces later)
 nstack login --all               # log in once per persona; the session is kept
 nstack up                        # every persona, side by side
 ```
@@ -34,13 +34,10 @@ tile: grid                       # All space: grid (default) | row
 personas:                        # at least one; names: lowercase letters, digits, dashes, max 16
   admin:
     device: desktop              # default desktop
-    start: /dashboard            # default /
   storage:
     device: pixel-8
-    start: /storage/floor
   customer:
     device: ipad-air
-    start: /portal
     login:                       # optional scripted login; leave out to log in by hand
       fill:
         "input[name=login]": "customer@example.com"
@@ -67,13 +64,13 @@ Ready-made configs: [Rails + Devise](examples/rails-devise/nstack.yml), [Next.js
 
 | Command | Does |
 |---|---|
-| `nstack init` | Write a sample `nstack.yml` with two personas (never over an existing one) and add `.nstack/` to `.gitignore`. Electron itself comes with the npm install. |
+| `nstack init` | Write a sample `nstack.yml` with one space (`me`, desktop) (never over an existing one) and add `.nstack/` to `.gitignore`. Electron itself comes with the npm install. |
 | `nstack login <persona>…` | Open a window on that persona's session at `loginPath`. Log in by hand (or let the `login` block fill the form); it closes once the app sends you elsewhere. |
 | `nstack login --all` | The same for every persona, one after another. |
 | `nstack up [personas…]` | Open the shell with every (or the named) persona as a space. `--sync` mirrors navigation. |
-| `nstack add <name> --device <preset> [--start /path]` | Append a persona to `nstack.yml` and open its space, in the shell already running in that folder or a new one. The rest of the file, comments included, stays as you wrote it. |
+| `nstack add <name> --device <preset>` | Append a persona to `nstack.yml` and open its space, in the shell already running in that folder or a new one. The rest of the file, comments included, stays as you wrote it. |
 | `nstack remove <name>…` | Delete personas from `nstack.yml` (the rest of the file stays as written) and close their spaces in the running shell. Saved logins stay in `.nstack/` until `nstack reset`. |
-| `nstack shot [path]` | Screenshot every persona at `path` (default: each `start`) at its real viewport size into a new run folder, `.nstack/shots/<YYYY-MM-DD-HHmm>[-<path>]/`, one `<persona>-<device>-<W>x<H>@<dpr>x.png` each plus a `README.md` table saying what every image is (device, viewport, pixel ratio, URL, or why it was skipped). Uses the running shell if there is one, otherwise shoots offscreen and exits. The shell's **Screenshot** button asks for a folder instead (remembered for next time). |
+| `nstack shot [path]` | Screenshot every persona at `path` (default: `/`) at its real viewport size into a new run folder, `.nstack/shots/<YYYY-MM-DD-HHmm>[-<path>]/`, one `<persona>-<device>-<W>x<H>@<dpr>x.png` each plus a `README.md` table saying what every image is (device, viewport, pixel ratio, URL, or why it was skipped). Uses the running shell if there is one, otherwise shoots offscreen and exits. The shell's **Screenshot** button asks for a folder instead (remembered for next time). |
 | `nstack reset [persona…]` | Forget saved sessions for every (or the named) persona. |
 | `nstack mock` | Serve the clickable UI mock in your browser (also what plain `nstack` does). |
 
@@ -81,8 +78,8 @@ Run `login` and `reset` while `nstack up` is closed. `nstack <command> --help` l
 
 ## The shell
 
-- **Spaces.** One persona fills the view, scaled to fit with its true aspect ratio; the strip shows a live thumbnail of each. Switch with a click, the ‹ › arrows on the stage, ← / → (both cycle), `1`–`9`; `0` or `a` is the **All** space, every persona tiled (`grid` packs every space as large as it can, snapped together, true relative sizes; `row` gives one shared height). The **+** tile adds a persona and a tile's **×** removes one (from `nstack.yml` too, after a confirm); drag a tile to reorder the strip (the order is remembered, and `1`–`9` follow it). Each space has an address bar just above its frame: type a path (or a full URL) and press Enter to take that persona there; with Sync on the others follow.
-- **Control bar.** Persona chips (red dot = logged out, click to log in; green = click to forget the session), **Up** (every persona back to its start page), **Login** (the first logged-out persona), **Screenshot** (asks for a folder, then shoots every persona into a new run folder there, with its `README.md`), **Sync**, `grid` / `row`, and a read-only `nstack.yml` drawer. The last space, Sync and tile mode are remembered.
+- **Spaces.** Every space opens at the app's root (`baseUrl` + `/`). One persona fills the view, scaled to fit with its true aspect ratio; the strip shows a live thumbnail of each. Switch with a click, the ‹ › arrows on the stage, ← / → (both cycle), `1`–`9`; `0` or `a` is the **All** space, every persona tiled (`grid` packs every space as large as it can, snapped together, true relative sizes; `row` gives one shared height). The **+** tile adds a persona and a tile's **×** removes one (from `nstack.yml` too, after a confirm); drag a tile to reorder the strip (the order is remembered, and `1`–`9` follow it). Each space has an address bar just above its frame: type a path (or a full URL) and press Enter to take that persona there; with Sync on the others follow.
+- **Control bar.** Persona chips (red dot = logged out, click to log in; green = click to forget the session), **Login** (the first logged-out persona), **Screenshot** (asks for a folder, then shoots every persona into a new run folder there, with its `README.md`), **Sync**, `grid` / `row`, and a read-only `nstack.yml` drawer. The last space, Sync and tile mode are remembered.
 - **Terminal pane.** Echoes every action as the CLI line it stands for; click its header to collapse it.
 - **Logged out.** A persona the app bounces to `loginPath` shows a placeholder telling you to run `nstack login <persona>`.
 - **Sync** (`--sync` or the toggle). Navigate one persona to `/invoices` and the others follow, each as its own user. Only the path is replayed (no scroll or clicks); logged-out personas are skipped with a note.

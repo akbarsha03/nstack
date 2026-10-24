@@ -5,7 +5,6 @@ loginPath: /users/sign_in        # Devise's new_user_session_path
 personas:
   admin:
     device: desktop
-    start: /admin
     login:
       fill:
         "input[name='user[email]']": "admin@example.com"
@@ -13,7 +12,6 @@ personas:
       submit: "[type=submit]"
   staff:
     device: pixel-8
-    start: /
     login:
       fill:
         "input[name='user[email]']": "staff@example.com"
@@ -21,5 +19,4 @@ personas:
       submit: "[type=submit]"
   customer:
     device: iphone-15
-    start: /
     # no login block: run `nstack login customer` and sign in by hand once (OTP, magic link, SSO...)

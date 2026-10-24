@@ -11,11 +11,11 @@ const e2e = { skip: !process.env.NSTACK_E2E && 'set NSTACK_E2E=1 (needs electron
 const BIN = path.join(__dirname, '..', '..', 'bin', 'nstack.js');
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// /a is where persona a starts; a moment later its SPA router pushes /p twice (one click, two in-page navigations).
+// every space opens at /. For a (the only desktop user agent) a moment later its SPA router pushes /p twice (one click,
+// two in-page navigations); b and c get a mobile user agent and a plain page.
 // /p, like a real app, rewrites its own URL on load: a follower that echoed that would bounce everyone again.
 const PAGES: Record<string, string> = {
-  '/a': '<script>setTimeout(() => { history.pushState({}, "", "/p"); history.pushState({}, "", "/p?x=1") }, 3000)</script>',
-  '/b': 'b', '/c': 'c',
+  '/': '<script>if (!/Mobile/.test(navigator.userAgent)) setTimeout(() => { history.pushState({}, "", "/p"); history.pushState({}, "", "/p?x=1") }, 3000)</script>',
   '/p': '<script>history.replaceState({}, "", location.pathname + location.search + "&tab=1")</script>',
 };
 
@@ -31,9 +31,9 @@ test('nstack up --sync: A to /p moves B and C there exactly once, no ping-pong',
   fs.writeFileSync(path.join(dir, 'nstack.yml'), `baseUrl: http://127.0.0.1:${(server.address() as { port: number }).port}
 loginPath: /login
 personas:
-  a: { device: desktop, start: /a }
-  b: { device: iphone-15, start: /b }
-  c: { device: 1000x700, start: /c }
+  a: { device: desktop }
+  b: { device: iphone-15 }
+  c: { device: ipad-air }
 `);
   let out = '';
   const up = spawn(process.execPath, [BIN, 'up', '--sync'], { cwd: dir });
@@ -48,7 +48,7 @@ personas:
     await wait(5000); // long enough for any echo to come back round
     const pages = hits.filter(h => !h.startsWith('/favicon'));
     assert.deepEqual(pages.filter(h => h.startsWith('/p')), ['/p?x=1', '/p?x=1'], `${pages}\n${out}`);
-    assert.deepEqual(pages.filter(h => !h.startsWith('/p')).sort(), ['/a', '/b', '/c'], `${pages}`);
+    assert.deepEqual(pages.filter(h => !h.startsWith('/p')).sort(), ['/', '/', '/'], `${pages}`);
     assert.equal(out.match(/\(sync\)/g)?.length, 2, out);
   } finally {
     up.kill('SIGINT');

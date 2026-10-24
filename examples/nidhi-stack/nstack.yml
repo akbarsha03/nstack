@@ -5,10 +5,7 @@ loginPath: /sign-in
 personas:
   admin:
     device: desktop
-    start: /dashboard
   storage:
     device: pixel-8              # the floor worker's phone
-    start: /storage/search
   collections:
     device: ipad-air             # the calling team's tablet
-    start: /collections

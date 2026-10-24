@@ -46,14 +46,14 @@ Nothing open source does both as a product. That is the gap.
 
 ### In
 
-1. **Config file** `nstack.yml` in the project root: base URL, list of personas, each with a login recipe, viewport, optional start path.
+1. **Config file** `nstack.yml` in the project root: base URL, list of personas, each with a login recipe, viewport. Every space opens at the root (`baseUrl` + `/`); there is no per-persona start path.
 2. **Login once, remember forever** (until it expires): `nstack login <persona>` opens one window, you log in by hand, it saves the session (cookies + localStorage) to `.nstack/<persona>.json`. Optional scripted login for apps with a plain form.
 3. **`nstack up`**: opens the nstack shell window with every persona loaded in its own isolated web view at its viewport, restored session. **One persona visible at a time** (a "space"); a strip under the control bar shows live thumbnails of the rest plus an **All** space that tiles every persona, and a **+** tile to add one. Switch by click, ← / →, `1`–`9`, `0`/`a` for All, or a sideways trackpad swipe. See `mock/index.html`.
 4. **Device presets**: `iphone-15`, `pixel-8`, `ipad-air`, `laptop`, `desktop`, plus `WxH` literal. Sets viewport, device scale factor, touch, user agent. The window is scaled to fit the shell while keeping its true aspect ratio; the frame title shows persona, device and real size.
 5. **Sync navigation (opt-in)**: `--sync` makes a path change in one window replay in the others (relative path only, so each stays its own user). Off by default.
 6. **`nstack shot [path]`**: screenshot every persona at the given path to `.nstack/shots/<persona>.png`. Handy for PR comments.
 7. **Expired session handling**: on a redirect to the login URL, print "persona X logged out — run `nstack login X`" and keep going.
-8. **`nstack add <name> --device <preset> [--start /path]`**: adds a persona to `nstack.yml` and opens its space; the **+** tile in the UI does the same.
+8. **`nstack add <name> --device <preset>`**: adds a persona to `nstack.yml` and opens its space; the **+** tile in the UI does the same.
 9. **Control bar** (top of the shell): base URL, persona chips with status dot (click a logged-out chip to log in, a logged-in one to reset), `Login`, `Shot`, `Sync` toggle, `grid`/`row` (All space only), `nstack.yml` drawer, collapsible terminal pane that echoes every action as the CLI line it corresponds to.
 10. **Works on macOS, Linux, Windows.**
 
@@ -85,13 +85,10 @@ tile: grid                   # All space only: grid | row
 personas:
   admin:
     device: desktop          # 1440x900 @1x
-    start: /dashboard
   storage:
     device: pixel-8          # 412x915 @2.6, touch, mobile UA
-    start: /storage/floor
   customer:
     device: ipad-air
-    start: /portal
     login:                   # optional scripted login; omit to log in by hand
       fill:
         "input[name=login]": "customer@example.com"
@@ -107,8 +104,8 @@ personas:
 | `nstack login <persona>` | Open one window, wait until URL leaves `loginPath`, save session |
 | `nstack login --all` | Same, one after another |
 | `nstack up [personas…]` | Open the shell with all (or named) personas as spaces; `--sync` to mirror paths |
-| `nstack add <name> --device <preset> [--start /p]` | Append a persona to `nstack.yml`, open its space |
-| `nstack shot [path]` | Screenshot every persona at `path` (default: each `start`) |
+| `nstack add <name> --device <preset>` | Append a persona to `nstack.yml`, open its space |
+| `nstack shot [path]` | Screenshot every persona at `path` (default: `/`) |
 | `nstack reset [persona]` | Delete saved sessions |
 
 ### 5.4 Spaces and tiling

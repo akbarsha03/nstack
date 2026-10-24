@@ -10,8 +10,8 @@ import { emulate, loggedOut } from './persona.js';
 export type Shot = { name: string; status: 'ok' | 'out' | 'fail'; line: string; dir: string; png?: string; file?: string; width?: number; height?: number };
 
 const pad = (s: string, n = 10) => s.padEnd(n);
-// `path` as typed, or the persona's start; always app-relative so each persona stays on its own user
-export const shotPath = (p: string | undefined, start: string) => !p ? start : p.startsWith('/') ? p : '/' + p;
+// `path` as typed, or the root; always app-relative so each persona stays on its own user
+export const shotPath = (p: string | undefined) => !p ? '/' : p.startsWith('/') ? p : '/' + p;
 
 // a path as a folder-name suffix: /storage/search?q=og → storage-search-q-og
 export const slug = (p: string) => p.replace(/[^a-z0-9]+/gi, '-').replace(/^-+/, '').slice(0, 40).replace(/-+$/, '');
@@ -36,7 +36,7 @@ export function manifest(o: { time: Date; baseUrl: string; at?: string; rows: Ro
   return [
     `# nstack shot · ${o.time.toISOString()} · ${o.baseUrl}`,
     '',
-    `Path: ${o.at ? '`' + o.at + '`' : "each persona's start page"}`,
+    `Path: \`${shotPath(o.at)}\``,
     '',
     '| File | Persona | Device | Viewport (CSS px) | Pixel ratio | Image size (px) | Touch / mobile UA | URL | Status |',
     '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
@@ -69,7 +69,7 @@ export async function shoot(config: Config, names: string[], dir: string, at?: s
   const out: Shot[] = [], rows: Row[] = [];
   for (const name of names) {
     const device = config.personas[name].device, d = parseDevice(device)!, file = path.join(run, shotFile(name, device, d)), rel = show(file);
-    const url = config.baseUrl.replace(/\/$/, '') + shotPath(at, config.personas[name].start);
+    const url = config.baseUrl.replace(/\/$/, '') + shotPath(at);
     const row = { persona: name, device, d, url };
     const gone = (): Shot => {
       rows.push({ ...row, status: 'logged out' });

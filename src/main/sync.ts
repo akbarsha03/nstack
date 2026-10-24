@@ -1,5 +1,5 @@
 // --sync: a path change in one persona replays in the others. Relative path only, so each stays its own user.
-// Echo guard: a persona main is loading (start page, Up, login, a sync follow) is "driven" — its navigations are not
+// Echo guard: a persona main is loading (opening at the root, login, a sync follow) is "driven" — its navigations are not
 // the user's until it stopped loading and then stayed quiet for guardMs (which absorbs client-side redirects and the
 // router's replaceState right after load). Debounce: an SPA can fire several in-page navigations for one click;
 // only the last path within debounceMs is sent.

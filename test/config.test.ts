@@ -7,7 +7,6 @@ baseUrl: http://localhost:3000
 personas:
   admin:
     device: desktop
-    start: /dashboard
   customer:
     device: ipad-air
     login:
@@ -25,8 +24,7 @@ test('parses a valid config and fills defaults', () => {
   assert.equal(c.loginPath, '/sign-in');
   assert.equal(c.tile, 'grid');
   assert.deepEqual(Object.keys(c.personas), ['admin', 'customer']);
-  assert.equal(c.personas.admin.start, '/dashboard');
-  assert.equal(c.personas.customer.start, '/');
+  assert.equal(c.personas.admin.device, 'desktop');
 });
 
 test('expands $ENV and ${ENV} in strings', () => {
@@ -47,8 +45,8 @@ test('rejects invalid configs with readable messages', () => {
   bad('baseUrl: localhost:3000\npersonas: {a: {}}', /baseUrl: must be an http\(s\) URL/);
   bad('baseUrl: http://x\npersonas: {}', /personas: add at least one persona/);
   bad('baseUrl: http://x\npersonas: {Admin: {}}', /lowercase/);
-  bad('baseUrl: http://x\npersonas: {a: {start: dashboard}}', /personas\.a\.start: must start with \//);
-  bad('baseUrl: http://x\npersonas: {a: {strat: /x}}', /personas\.a.*strat/);
+  bad('baseUrl: http://x\npersonas: {a: {start: /dashboard}}', /personas\.a\.start: `start` is gone: every space opens at the root; remove it from personas\.a/);
+  bad('baseUrl: http://x\npersonas: {a: {strat: x}}', /personas\.a.*strat/);
   bad('baseUrl: http://x\ntile: column\npersonas: {a: {}}', /tile/);
   bad('baseUrl: [unclosed', /not valid YAML/);
   bad('', /baseUrl/);
@@ -67,9 +65,9 @@ test('flags literal passwords but not $ENV ones', () => {
 });
 
 test('removePersona cuts one entry and keeps comments and the other personas', () => {
-  const yml = 'baseUrl: http://x\npersonas:\n  # the boss\n  admin:\n    device: desktop # big\n    start: /d\n  storage: {device: pixel-8} # floor\ntile: row # end\n';
+  const yml = 'baseUrl: http://x\npersonas:\n  # the boss\n  admin:\n    device: desktop # big\n    login: {fill: {}, submit: b}\n  storage: {device: pixel-8} # floor\ntile: row # end\n';
   assert.equal(removePersona(yml, 'admin'), 'baseUrl: http://x\npersonas:\n  # the boss\n  storage: {device: pixel-8} # floor\ntile: row # end\n');
-  assert.equal(removePersona(yml, 'storage'), 'baseUrl: http://x\npersonas:\n  # the boss\n  admin:\n    device: desktop # big\n    start: /d\ntile: row # end\n');
+  assert.equal(removePersona(yml, 'storage'), 'baseUrl: http://x\npersonas:\n  # the boss\n  admin:\n    device: desktop # big\n    login: {fill: {}, submit: b}\ntile: row # end\n');
   assert.deepEqual(Object.keys(parseConfig(removePersona('baseUrl: http://x\npersonas: {a: {}, b: {}}\n', 'a')).personas), ['b']);
 });
 

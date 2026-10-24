@@ -6,16 +6,12 @@ baseUrl: http://localhost:3000   # your dev server
 loginPath: /sign-in              # where the app sends a logged-out user
 tile: grid                       # All space: grid | row
 personas:
-  admin:
+  me:                            # one space to start with; add more with nstack add or the + tile
     device: desktop              # 1440x900; also laptop, ipad-air, pixel-8, iphone-15 or WxH
-    start: /
-  customer:
-    device: iphone-15            # 393x852 @3x, touch, iPhone user agent
-    start: /
     # login:                     # optional scripted login; leave out to log in by hand
     #   fill:
-    #     "input[name=email]": "customer@example.com"
-    #     "input[name=password]": "$CUSTOMER_PASSWORD"   # read from the environment
+    #     "input[name=email]": "me@example.com"
+    #     "input[name=password]": "$ME_PASSWORD"   # read from the environment
     #   submit: "button[type=submit]"
 `;
 
@@ -28,7 +24,7 @@ export function init(dir: string, configFile = 'nstack.yml'): string[] {
     out.push(`${configFile} already exists, left as is`);
   } else {
     fs.writeFileSync(config, SAMPLE);
-    out.push(`wrote ${configFile} with two personas: admin (desktop), customer (iphone-15)`);
+    out.push(`wrote ${configFile} with one space: me (desktop)`);
   }
   const ignore = path.join(dir, '.gitignore');
   const text = fs.existsSync(ignore) ? fs.readFileSync(ignore, 'utf8') : '';

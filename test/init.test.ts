@@ -11,9 +11,9 @@ const read = (dir: string, f: string) => fs.readFileSync(path.join(dir, f), 'utf
 
 test('the sample config is valid and `nstack add` can extend it', () => {
   const c = parseConfig(SAMPLE, {});
-  assert.deepEqual(Object.keys(c.personas), ['admin', 'customer']);
-  const { text } = addPersona(SAMPLE, 'staff', { device: 'pixel-8', start: '/floor' });
-  assert.deepEqual(Object.keys(parseConfig(text, {}).personas), ['admin', 'customer', 'staff']);
+  assert.deepEqual(c.personas, { me: { device: 'desktop' } });
+  const { text } = addPersona(SAMPLE, 'staff', { device: 'pixel-8' });
+  assert.deepEqual(Object.keys(parseConfig(text, {}).personas), ['me', 'staff']);
 });
 
 test('fresh folder: writes nstack.yml and a .gitignore with .nstack/', () => {

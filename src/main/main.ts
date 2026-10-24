@@ -39,7 +39,7 @@ const views = new Map<string, WebContentsView>();
 const devices = new Map<string, Device>();
 const out = new Set<string>(); // personas the app bounced to loginPath
 const base = config.baseUrl.replace(/\/$/, '');
-const startUrl = (name: string) => base + config.personas[name].start;
+const home = base + '/'; // every space opens at the app's root
 const size = (name: string) => `${devices.get(name)!.width}×${devices.get(name)!.height}`;
 const pad = (s: string, n = 10) => s.padEnd(n);
 const rel = (url: string) => relPath(url, config.baseUrl) ?? url; // what a frame's address bar shows
@@ -152,7 +152,7 @@ async function thumbs() {
 }
 
 function watchLogin(name: string, v: WebContentsView) {
-  let from = startUrl(name), at = from;
+  let from = home, at = from;
   const check = (to: string) => {
     if (!out.has(name) && loggedOut(from, to, config.baseUrl, config.loginPath)) {
       out.add(name);
@@ -187,12 +187,12 @@ function open(name: string): Line {
   });
   views.set(name, v);
   // the DevTools protocol needs a live page to answer, so emulate on a blank one, then go
-  load(name, 'about:blank').then(() => emulate(v.webContents, d, 1)).then(() => load(name, startUrl(name)))
+  load(name, 'about:blank').then(() => emulate(v.webContents, d, 1)).then(() => load(name, home))
     .then(() => v.webContents.navigationHistory.clear()); // no Back to the blank page
-  return ['', `${pad(name)} ${pad(config.personas[name].device, 9)} ${pad(size(name), 9)} → ${startUrl(name)}`];
+  return ['', `${pad(name)} ${pad(config.personas[name].device, 9)} ${pad(size(name), 9)} → ${home}`];
 }
 
-const addCmd = (name: string, p: Persona) => `nstack add ${name} --device ${p.device}${p.start === '/' ? '' : ` --start ${p.start}`}`;
+const addCmd = (name: string, p: { device: string }) => `nstack add ${name} --device ${p.device}`;
 
 // a persona already written to nstack.yml (by the CLI or by the + tile) gets its space
 function added(name: string, p: Persona): Line[] {
@@ -200,7 +200,7 @@ function added(name: string, p: Persona): Line[] {
   config.personas[name] = p;
   const view = open(name);
   names.push(name);
-  const lines: Line[] = [['dim', `added personas.${name} to ${path.basename(file)} · start ${p.start} · ${size(name)}`], view];
+  const lines: Line[] = [['dim', `added personas.${name} to ${path.basename(file)} · ${size(name)}`], view];
   log(addCmd(name, p), lines);
   goTo(name);
   win.show();
@@ -232,7 +232,7 @@ async function logIn(name: string) {
   busy.delete(name);
   if (!ok) return;
   out.delete(name);
-  load(name, startUrl(name));
+  load(name, home);
   layout();
   sendState();
 }
@@ -304,19 +304,14 @@ app.whenReady().then(() => {
     if (who && views.has(who)) logIn(who);
     else log('nstack login --all', [['ok', `all ${names.length} sessions valid, nothing to do`]]);
   });
-  // Up: every logged-in persona back to its start page
-  ipcMain.on('nstack:up', () => {
-    for (const n of names) if (!out.has(n)) load(n, startUrl(n));
-    log('nstack up', names.map(n => out.has(n) ? ['bad', `${pad(n)} logged out  → run nstack login ${n}`] : ['', `${pad(n)} → ${startUrl(n)}`]));
-  });
-  ipcMain.on('nstack:add', (_e, a: { name: string; device: string; start: string; login: boolean }) => {
+  ipcMain.on('nstack:add', (_e, a: { name: string; device: string; login: boolean }) => {
     try {
-      const { text, persona } = addPersona(fs.readFileSync(file, 'utf8'), a.name, { device: a.device, start: a.start }, path.basename(file));
+      const { text, persona } = addPersona(fs.readFileSync(file, 'utf8'), a.name, { device: a.device }, path.basename(file));
       fs.writeFileSync(file, text);
       added(a.name, persona);
       if (a.login) logIn(a.name);
     } catch (e) {
-      log(addCmd(a.name, { device: a.device, start: a.start }), [['bad', (e as Error).message]]);
+      log(addCmd(a.name, a), [['bad', (e as Error).message]]);
     }
   });
   // Screenshot button: ask for a folder first (native views would paint over the dialog, so hide them meanwhile)

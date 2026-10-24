@@ -6,7 +6,6 @@ loginPath: /api/auth/signin
 personas:
   admin:
     device: laptop
-    start: /dashboard
     login:
       fill:
         "input[name=username]": "admin"
@@ -14,7 +13,6 @@ personas:
       submit: "button[type=submit]"
   member:
     device: iphone-15
-    start: /
     login:
       fill:
         "input[name=username]": "member"
@@ -23,4 +21,3 @@ personas:
   # OAuth-only (GitHub, Google...): no login block, `nstack login visitor` and click through once
   visitor:
     device: ipad-air
-    start: /

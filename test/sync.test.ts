@@ -63,7 +63,7 @@ test('a client-side redirect right after a follower stopped loading is still an 
 test('a persona main is still loading never leads', (t: TestContext) => {
   const tm = t.mock.timers;
   const { s, gone } = setup(t);
-  s.drive('a'); // start page / Up / login
+  s.drive('a'); // opening / login
   s.navigated('a', url('/dashboard'));
   tm.tick(10_000);
   assert.deepEqual(gone, []);

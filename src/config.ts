@@ -7,7 +7,7 @@ const urlPath = z.string().startsWith('/', 'must start with /');
 
 const Persona = z.strictObject({
   device: z.string().refine(d => parseDevice(d), 'unknown device: use iphone-15, pixel-8, ipad-air, laptop, desktop or WxH like 1366x768').default('desktop'),
-  start: urlPath.default('/'),
+  start: z.unknown().optional(), // gone; only declared so the message below can say so
   login: z.strictObject({ fill: z.record(z.string(), z.string()), submit: z.string() }).optional(),
 });
 
@@ -20,6 +20,7 @@ const Schema = z.strictObject({
   personas: z.record(z.string(), Persona).superRefine((p, ctx) => {
     if (!Object.keys(p).length) ctx.addIssue({ code: 'custom', message: 'add at least one persona' });
     for (const name of Object.keys(p)) {
+      if (p[name].start !== undefined) ctx.addIssue({ code: 'custom', path: [name, 'start'], message: `\`start\` is gone: every space opens at the root; remove it from personas.${name}` });
       if (!NAME.test(name)) ctx.addIssue({ code: 'custom', path: [name], message: 'persona names are lowercase letters, digits and dashes, max 16' });
     }
   }),
@@ -78,7 +79,7 @@ export function literalPasswords(text: string): string[] {
       .map(([sel]) => `personas.${name}.login.fill["${sel}"]`));
 }
 
-export type NewPersona = { device: string; start?: string };
+export type NewPersona = { device: string };
 
 // `nstack add`: the file text with personas.<name> appended. Edits the text in place so every other byte (comments,
 // alignment, quoting) stays as written; only a flow-style `personas: {…}` gets re-printed by the yaml lib.
@@ -90,7 +91,7 @@ export function addPersona(text: string, name: string, p: NewPersona, file = 'ns
   if (doc.errors.length) throw new ConfigError(`${file}: not valid YAML\n  ${doc.errors[0].message.split('\n')[0]}`);
   const before = doc.toJS()?.personas ?? {};
   if (Object.hasOwn(before, name)) throw new ConfigError(`${name} is already in ${file}`);
-  const entry: NewPersona = p.start ? { device: p.device, start: p.start } : { device: p.device };
+  const entry: NewPersona = { device: p.device };
 
   let out: string;
   const map = doc.get('personas', true);
