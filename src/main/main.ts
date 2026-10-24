@@ -102,7 +102,7 @@ function layout(scrollOnly = false) {
   });
   win.webContents.send('nstack:scroll', { x: scrollX, max: scrollMax, stage: room.width, total });
   win.webContents.send('nstack:frames', names.map((name, i) => ({
-    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, addr: frames[i].addr, shown: all || name === space, out: out.has(name), touch: devices.get(name)!.touch, landscape: landscape.has(name), url: rel(views.get(name)!.webContents.getURL()),
+    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, addr: frames[i].addr, shown: all || name === space, out: out.has(name), touch: devices.get(name)!.touch, landscape: landscape.has(name), url: rel(views.get(name)!.webContents.getURL()), canBack: canBack(name),
   })));
 }
 
@@ -163,10 +163,25 @@ function reload(who: string[]) {
 }
 // ⌘/Ctrl+R anywhere in the window (shell page or a persona's page) reloads the current space, or every one in All,
 // never the shell page itself
+// a frame's Back button, Alt+← / ⌘[: one step back in that space; driven like reload, so Sync does not replay it
+function back(name: string) {
+  const wc = views.get(name)?.webContents;
+  if (!wc || out.has(name) || !wc.navigationHistory.canGoBack()) return;
+  sync.drive(name);
+  wc.navigationHistory.goBack();
+  log(`# back ${name}`);
+}
+const canBack = (name: string) => views.get(name)!.webContents.navigationHistory.canGoBack();
+
 const reloadKey = (e: Electron.Event, i: Electron.Input) => {
-  if (i.type !== 'keyDown' || !(i.meta || i.control) || i.alt || i.key.toLowerCase() !== 'r') return;
-  e.preventDefault();
-  reload(space === 'all' ? names : [space]);
+  if (i.type !== 'keyDown') return;
+  const k = i.key.toLowerCase();
+  if ((i.meta || i.control) && !i.alt && k === 'r') { e.preventDefault(); return reload(space === 'all' ? names : [space]); }
+  // back: Alt+← (any platform) or ⌘[ (mac), only with one space showing
+  if (space !== 'all' && ((i.alt && !i.meta && !i.control && i.key === 'ArrowLeft') || (process.platform === 'darwin' && i.meta && !i.alt && k === '['))) {
+    e.preventDefault();
+    back(space);
+  }
 };
 
 // ⟳ in a phone's or tablet's frame: portrait ↔ landscape (re-emulated by layout())
@@ -214,7 +229,7 @@ function watchLogin(v: WebContentsView) {
       sendState();
     }
     at = to;
-    if (ready) win.webContents.send('nstack:url', { name, path: rel(to) });
+    if (ready) win.webContents.send('nstack:url', { name, path: rel(to), canBack: canBack(name) });
     if (!out.has(name)) sync.navigated(name, to);
   };
   v.webContents.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) from = d.url; });
@@ -250,7 +265,12 @@ function open(name: string, fresh = false): Line {
     .then(() => { const n = alive(); if (n) return load(n, 'about:blank'); })
     .then(() => { const n = alive(); if (n) return emulate(v.webContents, dims(n), 1); })
     .then(() => { const n = alive(); if (n) return load(n, home); })
-    .then(() => { if (alive()) v.webContents.navigationHistory.clear(); }) // no Back to the blank page
+    .then(() => { // no Back to the blank page
+      const n = alive();
+      if (!n) return;
+      v.webContents.navigationHistory.clear();
+      if (ready) win.webContents.send('nstack:url', { name: n, path: rel(v.webContents.getURL()), canBack: false });
+    })
     .catch(() => {});
   return ['', `${pad(name)} ${pad(config.personas[name].device, 9)} ${pad(size(name), 9)} → ${home}`];
 }
@@ -388,6 +408,7 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:wheel', (_e, w: { dx: number; dy: number; shift: boolean }) => {
     if (space === 'all' && tile === 'row') scrollTo(scrollX + Number(w.shift && !w.dx ? w.dy : w.dx));
   });
+  ipcMain.on('nstack:back', (_e, name: string) => back(name));
   ipcMain.on('nstack:reload', (_e, name: string) => reload([name]));
   ipcMain.on('nstack:rotate', (_e, name: string) => rotate(name));
   ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));

@@ -145,13 +145,15 @@ nstack.on('frames', frames => {
   $('#frames').innerHTML = frames.filter(f => f.shown).map(f => `<div class="addr" style="left:${f.addr.x}px;top:${f.addr.y}px;width:${f.addr.width}px">
     <input class="url" data-url="${esc(f.name)}" value="${esc(f.url)}" spellcheck="false" autocomplete="off" aria-label="${esc(f.name)} address"><button data-go="${esc(f.name)}" title="Go">Go</button></div>
   <div class="frame" style="left:${f.rect.x}px;top:${f.rect.y}px;width:${f.rect.width}px;height:${f.rect.height}px">
-    <div class="bar" title="${esc(f.name)} · ${esc(f.device)} · ${esc(f.size)}"><span class="lights"><i></i><i></i><i></i></span><span class="label"><b>${esc(f.name)}</b><span class="meta"> · ${esc(f.device)} · ${esc(f.size)}</span></span><button type="button" class="ib rld" data-reload="${esc(f.name)}" title="Reload" aria-label="Reload ${esc(f.name)}"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6a4 4 0 1 1-1.2-2.85"/><path d="M9.5 1.2v2.3H7.2"/></svg></button>${f.touch ? `<button type="button" class="ib rot" data-rotate="${esc(f.name)}" title="Rotate to ${f.landscape ? 'portrait' : 'landscape'}" aria-label="Rotate ${esc(f.name)} to ${f.landscape ? 'portrait' : 'landscape'}"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.2" y="3.5" width="4.6" height="7.3" rx="0.8"/><path d="M5.5 1.4a5 5 0 0 1 5.1 5.1"/><path d="M9.2 5.4l1.4 1.2 1.1-1.5"/></svg></button>` : ''}</div>
+    <div class="bar" title="${esc(f.name)} · ${esc(f.device)} · ${esc(f.size)}"><span class="lights"><i></i><i></i><i></i></span><span class="label"><b>${esc(f.name)}</b><span class="meta"> · ${esc(f.device)} · ${esc(f.size)}</span></span><button type="button" class="ib bk" data-back="${esc(f.name)}" title="Back" aria-label="Back in ${esc(f.name)}" ${f.canBack ? '' : 'disabled'}><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 2.5 4 6l3.5 3.5"/></svg></button><button type="button" class="ib rld" data-reload="${esc(f.name)}" title="Reload" aria-label="Reload ${esc(f.name)}"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6a4 4 0 1 1-1.2-2.85"/><path d="M9.5 1.2v2.3H7.2"/></svg></button>${f.touch ? `<button type="button" class="ib rot" data-rotate="${esc(f.name)}" title="Rotate to ${f.landscape ? 'portrait' : 'landscape'}" aria-label="Rotate ${esc(f.name)} to ${f.landscape ? 'portrait' : 'landscape'}"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.2" y="3.5" width="4.6" height="7.3" rx="0.8"/><path d="M5.5 1.4a5 5 0 0 1 5.1 5.1"/><path d="M9.2 5.4l1.4 1.2 1.1-1.5"/></svg></button>` : ''}</div>
     ${f.out ? `<div class="lo"><b>⊘</b>Logged out<div>run <code>nstack login ${esc(f.name)}</code></div><button class="lb" data-login="${esc(f.name)}">Log in now</button></div>` : ''}</div>`).join('');
 });
 
 // a persona navigated; leave the address bar alone while it is being edited
-nstack.on('url', ({ name, path }) => {
+nstack.on('url', ({ name, path, canBack }) => {
   urls[name] = path;
+  const b = document.querySelector(`[data-back="${CSS.escape(name)}"]`);
+  if (b) b.disabled = !canBack;
   const i = document.querySelector(`input[data-url="${CSS.escape(name)}"]`);
   if (i && i !== document.activeElement) i.value = path;
 });
@@ -163,6 +165,8 @@ $('#frames').addEventListener('keydown', e => {
   i.blur();
 });
 $('#frames').addEventListener('click', e => {
+  const bk = e.target.closest('[data-back]');
+  if (bk) return nstack.send('back', bk.dataset.back);
   const rl = e.target.closest('[data-reload]');
   if (rl) return nstack.send('reload', rl.dataset.reload);
   const rot = e.target.closest('[data-rotate]');
