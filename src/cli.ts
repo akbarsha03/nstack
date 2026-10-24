@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { Command } from 'commander';
 import { loadConfig, addPersona, removePersona, renamePersona, ConfigError, literalPasswords, type Config } from './config.js';
 import { send } from './ipc.js';
-import { addAlias, partitionDir } from './aliases.js';
+import { partitionDir, newSession, renameSession, dropSession, sessionDir } from './sessions.js';
 import { serveMock } from './mock.js';
 import { init } from './init.js';
 
@@ -103,6 +103,7 @@ program.command('add')
     const { file, dir } = load(opts.config, [], anyEnv);
     try {
       fs.writeFileSync(file, addPersona(fs.readFileSync(file, 'utf8'), name, { device: opts.device }, path.basename(file)).text);
+      newSession(dir, name); // a new space never inherits a login
     } catch (e) {
       if (!(e instanceof ConfigError)) throw e;
       console.error(e.message);
@@ -120,7 +121,7 @@ program.command('add')
   });
 
 program.command('remove')
-  .description('remove personas from nstack.yml (and their spaces from the running shell); saved sessions are kept')
+  .description('remove personas from nstack.yml (and their spaces from the running shell); their saved logins are deleted too')
   .argument('<personas...>', 'persona names from nstack.yml')
   .option('-c, --config <file>', 'config file', 'nstack.yml')
   .action(async (names: string[], opts: { config: string }) => {
@@ -134,8 +135,11 @@ program.command('remove')
     }
     for (const name of names) {
       const reply = await send(dir, { remove: name }).catch((e: Error) => ({ error: e.message }));
-      if (reply?.lines) reply.lines.forEach((l: string) => console.log(l));
-      else console.log(`removed personas.${name} from ${path.basename(file)} · session kept in .nstack/` + (reply?.error ? ` (running shell: ${reply.error})` : ''));
+      if (reply?.lines) { reply.lines.forEach((l: string) => console.log(l)); continue; }
+      // no shell has it open: forget and delete its session here
+      const id = dropSession(dir, name);
+      if (id) fs.rmSync(sessionDir(dir, id), { recursive: true, force: true });
+      console.log(`removed personas.${name} from ${path.basename(file)} · login deleted` + (reply?.error ? ` (running shell: ${reply.error})` : ''));
     }
   });
 
@@ -153,10 +157,10 @@ program.command('rename')
       console.error(e.message);
       process.exit(1);
     }
-    // a running shell with that space moves it and records the alias; otherwise record it here
+    // a running shell with that space moves it and its session entry; otherwise move the entry here
     const reply = await send(dir, { rename: { from, to } }).catch((e: Error) => ({ error: e.message }));
     if (reply?.lines) return reply.lines.forEach((l: string) => console.log(l));
-    addAlias(dir, from, to);
+    renameSession(dir, from, to);
     console.log(`renamed personas.${from} → ${to} in ${path.basename(file)} · login kept` + (reply?.error ? ` (running shell: ${reply.error})` : ''));
   });
 

@@ -2,7 +2,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import type { Config } from '../config.js';
 import { login } from './login-window.js';
-import { partition } from '../aliases.js';
+import { partition } from '../sessions.js';
 
 // `nstack login`: one window per persona on its partition, in turn
 const { config, names, dir } = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string };

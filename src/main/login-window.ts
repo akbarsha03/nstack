@@ -25,7 +25,7 @@ const fillScript = (login: NonNullable<Config['personas'][string]['login']>) => 
 export type Say = (cls: 'ok' | 'bad' | 'dim', text: string) => void;
 const toConsole: Say = (cls, text) => (cls === 'bad' ? console.error : console.log)(text);
 
-// part: the persona's partition (aliases.ts), e.g. persist:<name>
+// part: the persona's partition (sessions.ts), e.g. persist:admin-3f9a1c
 export function login(config: Config, name: string, part: string, say: Say = toConsole): Promise<boolean> {
   const loginUrl = config.baseUrl.replace(/\/$/, '') + config.loginPath;
   const p = config.personas[name], d = parseDevice(p.device)!;

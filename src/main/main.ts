@@ -5,7 +5,7 @@ import { app, BrowserWindow, WebContentsView, dialog, ipcMain, nativeImage, type
 import { addPersona, removePersona, renamePersona, quickName, parseConfig, ConfigError, type Config } from '../config.js';
 import { parseDevice, rotated, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
-import { addAlias, partition } from '../aliases.js';
+import { partition, newSession, renameSession, dropSession, sweepSessions } from '../sessions.js';
 import { nextSpace, spaceForKey, fitFrames, rowFrames, rowWidth, packFrames, inset, reorder, type Frame, type Rect } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
@@ -16,7 +16,7 @@ type Persona = Config['personas'][string];
 const up = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string; file: string; space?: string; sync?: boolean };
 const { config, dir, file } = up;
 const nstackDir = path.join(dir, '.nstack');
-// per-project profile: each persona's `persist:` partition (aliases.ts keeps a renamed one's) (cookies, storage) lives under here
+// per-project profile: each space's `persist:<session id>` partition (sessions.ts: cookies, storage) lives under here
 app.setPath('userData', path.join(nstackDir, 'electron'));
 
 // last space, tile mode, Sync and its prefs, and the strip order survive restarts
@@ -220,11 +220,12 @@ function watchLogin(v: WebContentsView) {
   v.webContents.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) from = d.url; });
   v.webContents.on('did-navigate', (_e, url) => check(url));
   v.webContents.on('did-navigate-in-page', (_e, url, isMain) => { if (isMain) { from = at; check(url); } });
-  v.webContents.on('did-stop-loading', () => sync.stopped(nameOf.get(v)!));
+  v.webContents.on('did-stop-loading', () => { const n = nameOf.get(v); if (n) sync.stopped(n); });
 }
 
-// one isolated view per persona; returns its line for the terminal
-function open(name: string): Line {
+// one isolated view per persona; returns its line for the terminal. fresh: a just-added space, whose session is wiped
+// before anything loads so even a stale folder can't hand it a login
+function open(name: string, fresh = false): Line {
   const d = parseDevice(config.personas[name].device)!;
   devices.set(name, d);
   const v = new WebContentsView({
@@ -238,24 +239,32 @@ function open(name: string): Line {
   v.webContents.on('before-input-event', reloadKey);
   win.contentView.addChildView(v);
   v.webContents.on('did-fail-load', (_e, code, desc, url, isMain) => {
-    if (isMain && code !== -3) log(null, [['bad', `${pad(nameOf.get(v)!)} could not load ${url}: ${desc}`]]);
+    const n = nameOf.get(v);
+    if (n && isMain && code !== -3) log(null, [['bad', `${pad(n)} could not load ${url}: ${desc}`]]);
   });
   views.set(name, v);
   // the DevTools protocol needs a live page to answer, so emulate on a blank one, then go
-  load(name, 'about:blank').then(() => emulate(v.webContents, dims(name), 1)).then(() => load(nameOf.get(v)!, home))
-    .then(() => v.webContents.navigationHistory.clear()); // no Back to the blank page
+  // every step bails once the space is removed (or the view closed) mid-way
+  const alive = () => { const n = nameOf.get(v); return n !== undefined && views.get(n) === v && !v.webContents.isDestroyed() ? n : undefined; };
+  (fresh ? v.webContents.session.clearStorageData() : Promise.resolve())
+    .then(() => { const n = alive(); if (n) return load(n, 'about:blank'); })
+    .then(() => { const n = alive(); if (n) return emulate(v.webContents, dims(n), 1); })
+    .then(() => { const n = alive(); if (n) return load(n, home); })
+    .then(() => { if (alive()) v.webContents.navigationHistory.clear(); }) // no Back to the blank page
+    .catch(() => {});
   return ['', `${pad(name)} ${pad(config.personas[name].device, 9)} ${pad(size(name), 9)} → ${home}`];
 }
 
 const addCmd = (name: string, p: { device: string }) => `nstack add ${name} --device ${p.device}`;
 
 // a persona already written to nstack.yml (by the CLI or by the + tile) gets its space
+// (its fresh session id was already recorded by whoever added it: the + dialog below, or the CLI)
 function added(name: string, p: Persona): Line[] {
   if (views.has(name)) throw new ConfigError(`${name} is already open`);
   config.personas[name] = p;
-  const view = open(name);
+  const view = open(name, true);
   names.push(name);
-  const lines: Line[] = [['dim', `added personas.${name} to ${path.basename(file)} · ${size(name)}`], view];
+  const lines: Line[] = [['dim', `added personas.${name} to ${path.basename(file)} · ${size(name)} · new session`], view];
   log(addCmd(name, p), lines);
   goTo(name);
   win.show();
@@ -266,12 +275,19 @@ function added(name: string, p: Persona): Line[] {
 function removed(name: string): Line[] {
   const v = views.get(name);
   if (!v && !names.includes(name)) throw new ConfigError(`${name} is not open here`);
-  if (v) { win.contentView.removeChildView(v); v.webContents.close(); nameOf.delete(v); }
+  // its login goes with it: wiped now; the folder is swept at the next launch (Chromium keeps it open until then)
+  dropSession(dir, name);
+  if (v) {
+    win.contentView.removeChildView(v);
+    v.webContents.session.clearStorageData().catch(() => {});
+    v.webContents.close();
+    nameOf.delete(v);
+  }
   views.delete(name); devices.delete(name); out.delete(name); landscape.delete(name); delete config.personas[name];
   if (names.includes(name)) names.splice(names.indexOf(name), 1);
   const { [name]: _, ...follow } = sync.prefs.follow;
   sync.setPrefs({ follow });
-  const lines: Line[] = [['dim', `removed personas.${name} from ${path.basename(file)} · session kept in .nstack/`]];
+  const lines: Line[] = [['dim', `removed personas.${name} from ${path.basename(file)} · login deleted`]];
   log(`nstack remove ${name}`, lines);
   if (space === name) goTo(names.length === 1 ? names[0] : 'all');
   else { layout(); sendState(); saveState(); }
@@ -292,7 +308,7 @@ function renamed(from: string, to: string): Line[] {
   const { [from]: f, ...follow } = sync.prefs.follow;
   sync.setPrefs({ follow: f === undefined ? follow : { ...follow, [to]: f } });
   if (space === from) space = to;
-  addAlias(dir, from, to);
+  renameSession(dir, from, to);
   const lines: Line[] = [['dim', `renamed personas.${from} → ${to} in ${path.basename(file)} · login kept`]];
   log(`nstack rename ${from} ${to}`, lines);
   layout();
@@ -340,6 +356,7 @@ async function shot(at?: string, to?: string) {
 
 app.whenReady().then(() => {
   fs.mkdirSync(nstackDir, { recursive: true });
+  const swept = sweepSessions(dir); // removed spaces' session folders, before any session is opened
   win = new BrowserWindow({
     width: 1440, height: 960, backgroundColor: '#0c0f13', title: 'nstack',
     webPreferences: { preload: path.join(__dirname, 'shell-preload.js') },
@@ -347,7 +364,8 @@ app.whenReady().then(() => {
   win.loadFile(path.join(__dirname, '..', '..', '..', 'renderer', 'index.html'));
   win.webContents.on('before-input-event', reloadKey);
 
-  log('nstack up' + (sync.on ? ' --sync' : ''), [['dim', `config ${path.basename(file)} · baseUrl ${config.baseUrl}`], ...names.map(open)]);
+  log('nstack up' + (sync.on ? ' --sync' : ''), [['dim', `config ${path.basename(file)} · baseUrl ${config.baseUrl}`], ...names.map(n => open(n))]);
+  if (swept.length) log(null, [['dim', `deleted ${swept.length} unused session folder${swept.length > 1 ? 's' : ''} (${swept.join(', ')})`]]);
   log(null, [['dim', `${names.length} spaces + All · showing ${space} · sync ${sync.on ? 'on' : 'off'} · close the window or Ctrl+C to quit`]]);
 
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'package.json'), 'utf8'));
@@ -398,6 +416,7 @@ app.whenReady().then(() => {
     try {
       const { text, persona } = addPersona(fs.readFileSync(file, 'utf8'), a.name, { device: a.device }, path.basename(file));
       fs.writeFileSync(file, text);
+      newSession(dir, a.name!);
       added(a.name!, persona);
       if (a.login) logIn(a.name!);
     } catch (e) {
