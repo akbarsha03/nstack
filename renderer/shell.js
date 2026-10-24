@@ -2,7 +2,7 @@
 // main.ts lays over #stage; every action goes to main, which echoes it as its CLI line in the terminal.
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
-let personas = [], space = 'all';
+let personas = [], space = 'all', syncPrefs = { query: true, leaderOnlyCurrent: false, follow: {} };
 const thumbs = {}; // last live preview per persona, kept across strip re-renders
 const urls = {}; // each persona's current path, for its frame's address bar
 
@@ -71,6 +71,14 @@ function openAdd() {
   setTimeout(() => $('#ad-name').focus(), 30);
 }
 
+function openPrefs() {
+  $('#spf-query').checked = syncPrefs.query;
+  $('#spf-leader').checked = syncPrefs.leaderOnlyCurrent;
+  $('#spf-follow').innerHTML = personas.map(p => `<label class="ck"><input type="checkbox" data-follow="${esc(p.name)}" ${syncPrefs.follow[p.name] === false ? '' : 'checked'}> ${esc(p.name)}</label>`).join('');
+  show('#syncprefs');
+  setTimeout(() => $('#spf-query').focus(), 30);
+}
+
 nstack.on('init', s => {
   $('#ver').textContent = s.version;
   $('#base').textContent = s.baseUrl;
@@ -82,6 +90,7 @@ nstack.on('init', s => {
 nstack.on('state', s => {
   personas = s.personas;
   space = s.space;
+  syncPrefs = s.syncPrefs;
   chips();
   strip();
   document.querySelectorAll('[data-tile]').forEach(b => b.classList.toggle('on', b.dataset.tile === s.tile));
@@ -150,12 +159,19 @@ $('#ad-form').addEventListener('submit', e => {
   closeAll();
   nstack.send('add', add);
 });
+$('#spf-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const follow = Object.fromEntries([...document.querySelectorAll('[data-follow]')].map(c => [c.dataset.follow, c.checked]));
+  closeAll();
+  nstack.send('syncprefs', { query: $('#spf-query').checked, leaderOnlyCurrent: $('#spf-leader').checked, follow });
+});
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeAll));
 document.querySelectorAll('.scrim').forEach(s => s.addEventListener('click', e => { if (e.target === s) closeAll(); }));
 $('#b-up').onclick = () => nstack.send('up');
 $('#b-login').onclick = () => nstack.send('login');
 $('#b-shot').onclick = () => { $('#b-shot').disabled = true; nstack.send('shot'); };
 $('#b-sync').onclick = () => nstack.send('sync');
+$('#b-syncprefs').onclick = openPrefs;
 $('#b-yml').onclick = () => { nstack.send('yml'); show('#yml'); };
 document.querySelectorAll('[data-tile]').forEach(b => b.onclick = () => nstack.send('tile', b.dataset.tile));
 $('#b-term').onclick = () => $('#term').classList.toggle('closed'); // #stage shrinks or grows, the observer below re-lays out

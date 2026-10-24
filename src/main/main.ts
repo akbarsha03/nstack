@@ -9,7 +9,7 @@ import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, inset } from '.
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
 import { shoot } from './shot.js';
-import { createSync, relPath } from './sync.js';
+import { createSync, relPath, type SyncPrefs } from './sync.js';
 
 type Persona = Config['personas'][string];
 const up = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string; file: string; space?: string; sync?: boolean };
@@ -19,14 +19,14 @@ const nstackDir = path.join(dir, '.nstack');
 // per-project profile: each persona's `persist:<name>` partition (cookies, storage) lives under here
 app.setPath('userData', path.join(nstackDir, 'electron'));
 
-// last space, tile mode and Sync survive restarts
+// last space, tile mode, Sync and its prefs survive restarts
 const stateFile = path.join(nstackDir, 'state.json');
 const saved = (() => { try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { return {}; } })();
 const spaces = () => ['all', ...names];
 let space: string = up.space ?? saved.space ?? names[0];
 if (!spaces().includes(space)) space = names[0];
 let tile: 'grid' | 'row' = saved.tile === 'grid' || saved.tile === 'row' ? saved.tile : config.tile;
-const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on })); } catch {} };
+const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs })); } catch {} };
 
 const THUMB_MS = 1500;
 let win: BrowserWindow;
@@ -45,6 +45,8 @@ const rel = (url: string) => relPath(url, config.baseUrl) ?? url; // what a fram
 const sync = createSync({
   baseUrl: config.baseUrl,
   on: up.sync || saved.sync === true,
+  prefs: saved.syncPrefs,
+  isCurrent: name => name === space,
   go: (name, at) => views.get(name)!.webContents.loadURL(base + at).catch(() => {}),
   targets: leader => names.filter(n => n !== leader).map(n => [n, out.has(n) ? `logged out, not synced — run nstack login ${n}` : undefined]),
   report: (leader, at, results) => log(null, [['dim', `sync ${at} from ${leader}`],
@@ -64,7 +66,7 @@ function log(cmd: string | null, lines: Line[] = []) {
 }
 
 const sendState = () => ready && win.webContents.send('nstack:state', {
-  space, tile, sync: sync.on, personas: names.map(n => ({ name: n, device: config.personas[n].device, width: devices.get(n)!.width, height: devices.get(n)!.height, out: out.has(n) })),
+  space, tile, sync: sync.on, syncPrefs: sync.prefs, personas: names.map(n => ({ name: n, device: config.personas[n].device, width: devices.get(n)!.width, height: devices.get(n)!.height, out: out.has(n) })),
 });
 
 function layout() {
@@ -103,6 +105,14 @@ const onKey = (key: string) => {
 function setSync(on: boolean) {
   sync.set(on);
   log(`# --sync ${on ? 'on' : 'off'}`, [['dim', on ? 'path changes now replay in every space (relative path, each keeps its own user)' : 'spaces navigate on their own']]);
+  saveState();
+  sendState();
+}
+
+function setPrefs(p: Partial<SyncPrefs>) {
+  sync.setPrefs({ query: p.query !== false, leaderOnlyCurrent: p.leaderOnlyCurrent === true, follow: Object.fromEntries(names.map(n => [n, p.follow?.[n] !== false])) });
+  const { query, leaderOnlyCurrent, follow } = sync.prefs;
+  log(`# sync prefs: query ${query ? 'on' : 'off'} · leader ${leaderOnlyCurrent ? 'current' : 'any'} · follow ${names.filter(n => follow[n] !== false).join(',') || 'none'}`);
   saveState();
   sendState();
 }
@@ -247,6 +257,7 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:key', (_e, key: string) => onKey(key));
   ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));
   ipcMain.on('nstack:sync', () => setSync(!sync.on));
+  ipcMain.on('nstack:syncprefs', (_e, p: Partial<SyncPrefs>) => setPrefs(p ?? {}));
   // a frame's address bar: not driven, so with Sync on the other spaces follow like any navigation of yours
   ipcMain.on('nstack:goto', (_e, a: { name: string; path: string }) => {
     const v = views.get(a.name), p = String(a.path ?? '').trim();

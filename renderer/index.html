@@ -88,6 +88,8 @@ main{flex:1}
 .fake input,.fake select{width:100%;font:14px var(--sans);padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;background:#fff;color:#1e293b}
 .fake .ck{display:flex;align-items:center;gap:8px;font-size:14px;color:#1e293b;margin:0}
 .fake .ck input{width:auto;margin:0}
+.fake .ck + .ck{margin-top:8px}
+.fake h3{font-size:12px;font-weight:400;color:#64748b;margin:14px 0 6px}
 .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 #shots{background:#000e}
 .shots{margin:auto;display:flex;flex-direction:column;gap:16px;align-items:center}
@@ -118,6 +120,7 @@ main{flex:1}
   <button id="b-login" title="nstack login">Login</button>
   <button id="b-shot" title="nstack shot">Shot</button>
   <button id="b-sync" title="nstack up --sync" aria-pressed="false">Sync</button>
+  <button id="b-syncprefs" title="Sync preferences" aria-label="Sync preferences">⚙</button>
   <div class="seg" role="group" aria-label="tile mode (All space)" title="tile mode, applies in the All space">
     <button data-tile="grid">grid</button><button data-tile="row">row</button>
   </div>
@@ -148,6 +151,23 @@ main{flex:1}
     <div class="actions">
       <button type="button" data-close>Cancel</button>
       <button type="submit" class="primary">Add space</button>
+    </div>
+  </form>
+</div>
+
+<div class="scrim" id="syncprefs" role="dialog" aria-modal="true" aria-labelledby="spf-h">
+  <form class="modal" id="spf-form">
+    <h2 id="spf-h">Sync preferences</h2>
+    <p>How a navigation replays in the other spaces while Sync is on.</p>
+    <div class="fake">
+      <label class="ck"><input type="checkbox" id="spf-query"> Replay query string and hash</label>
+      <label class="ck"><input type="checkbox" id="spf-leader"> Only the space I'm looking at leads</label>
+      <h3>Spaces that follow</h3>
+      <div id="spf-follow"></div>
+    </div>
+    <div class="actions">
+      <button type="button" data-close>Cancel</button>
+      <button type="submit" class="primary">Save</button>
     </div>
   </form>
 </div>

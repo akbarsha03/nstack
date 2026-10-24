@@ -1,17 +1,17 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSync, relPath } from '../src/main/sync.js';
+import { createSync, relPath, type SyncPrefs } from '../src/main/sync.js';
 
 const BASE = 'http://localhost:3000';
 const url = (p: string) => BASE + p;
 
 // three personas; `go` behaves like a page: it loads, commits (did-navigate) and stops loading
-function setup(t: TestContext, opts: { on?: boolean; out?: string[]; follow?: (name: string, p: string) => void } = {}) {
+function setup(t: TestContext, opts: { on?: boolean; out?: string[]; follow?: (name: string, p: string) => void; prefs?: Partial<SyncPrefs>; current?: string } = {}) {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   const gone: [string, string][] = [], reports: [string, string, [string, string | undefined][]][] = [];
   const names = ['a', 'b', 'c'];
   const s = createSync({
-    baseUrl: BASE, on: opts.on ?? true,
+    baseUrl: BASE, on: opts.on ?? true, prefs: opts.prefs, isCurrent: n => n === (opts.current ?? 'a'),
     go: (n, p) => { gone.push([n, p]); opts.follow?.(n, p); },
     targets: leader => names.filter(n => n !== leader).map(n => [n, opts.out?.includes(n) ? 'logged out' : undefined]),
     report: (l, p, r) => reports.push([l, p, r]),
@@ -98,4 +98,39 @@ test('turning sync off drops a pending broadcast', (t: TestContext) => {
   tm.tick(1000);
   assert.deepEqual(gone, []);
   assert.equal(s.on, false);
+});
+
+test('prefs.query off replays the pathname only', (t: TestContext) => {
+  const { s, gone } = setup(t, { prefs: { query: false } });
+  s.navigated('a', url('/p?x=1#h'));
+  t.mock.timers.tick(300);
+  assert.deepEqual(gone, [['b', '/p'], ['c', '/p']]);
+});
+
+test('prefs.leaderOnlyCurrent: a space you are not looking at does not lead', (t: TestContext) => {
+  const { s, gone } = setup(t, { prefs: { leaderOnlyCurrent: true }, current: 'a' });
+  s.navigated('b', url('/q'));
+  t.mock.timers.tick(300);
+  assert.deepEqual(gone, []);
+  s.navigated('a', url('/p'));
+  t.mock.timers.tick(300);
+  assert.deepEqual(gone, [['b', '/p'], ['c', '/p']]);
+});
+
+test('prefs.follow: unchecked spaces are skipped and reported', (t: TestContext) => {
+  const { s, gone, reports } = setup(t, { prefs: { follow: { c: false } } });
+  s.navigated('a', url('/p'));
+  t.mock.timers.tick(300);
+  assert.deepEqual(gone, [['b', '/p']]);
+  assert.deepEqual(reports[0][2], [['b', undefined], ['c', 'not following (sync prefs)']]);
+});
+
+test('setPrefs applies to the next navigation and keeps sync on', (t: TestContext) => {
+  const { s, gone } = setup(t);
+  s.setPrefs({ query: false });
+  s.navigated('a', url('/p?x=1'));
+  t.mock.timers.tick(300);
+  assert.deepEqual(gone, [['b', '/p'], ['c', '/p']]);
+  assert.equal(s.on, true);
+  assert.equal(s.prefs.leaderOnlyCurrent, false);
 });

@@ -85,6 +85,7 @@ Run `login` and `reset` while `nstack up` is closed. `nstack <command> --help` l
 - **Terminal pane.** Echoes every action as the CLI line it stands for; click its header to collapse it.
 - **Logged out.** A persona the app bounces to `loginPath` shows a placeholder telling you to run `nstack login <persona>`.
 - **Sync** (`--sync` or the toggle). Navigate one persona to `/invoices` and the others follow, each as its own user. Only the path is replayed (no scroll or clicks); logged-out personas are skipped with a note.
+  - **⚙ Sync preferences**: replay the query string and hash or the path only, let only the space you're looking at lead, and pick which spaces follow. Saved in `.nstack/state.json`.
 
 ## Notes
 
