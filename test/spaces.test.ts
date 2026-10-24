@@ -1,14 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, reorder, BAR, ADDR } from '../src/main/spaces.js';
-
-test('grid tiles 3 personas as 2x2 inside the stage', () => {
-  const r = tileGrid({ x: 0, y: 100, width: 1000, height: 600 }, 3);
-  assert.equal(r.length, 3);
-  assert.deepEqual(r[0], { x: 8, y: 108, width: 488, height: 288 });
-  assert.equal(r[2].y, 108 + 288 + 8);
-  for (const c of r) assert.ok(c.x + c.width <= 1000 && c.y + c.height <= 700);
-});
+import { nextSpace, spaceForKey, fitFrames, rowFrames, packFrames, reorder, BAR, ADDR, type Frame } from '../src/main/spaces.js';
 
 test('arrow keys walk the strip and clamp at the ends', () => {
   const s = ['all', 'admin', 'storage', 'customer'];
@@ -42,12 +34,60 @@ test('fitFrames keeps true aspect ratio, never upscales, centres in the cell', (
   assert.deepEqual([small.view.width, small.view.height], [393, 852]);
 });
 
-test('All grid: one shared scale so relative sizes stay honest', () => {
-  const cells = tileGrid({ x: 0, y: 0, width: 1200, height: 800 }, 2);
-  const f = fitFrames(cells, [{ width: 1440, height: 900 }, { width: 393, height: 852 }], true);
-  assert.equal(f[0].scale, f[1].scale);
-  assert.ok(f[0].view.width / f[1].view.width > 3.6);
-  for (const [i, x] of f.entries()) assert.ok(x.frame.x >= cells[i].x && x.frame.x + x.frame.width <= cells[i].x + cells[i].width);
+// a packed space's whole footprint: address row through the bottom of the frame
+const box = (f: Frame) => ({ x: f.addr.x, y: f.addr.y, r: f.addr.x + f.addr.width, b: f.frame.y + f.frame.height });
+const apart = (fs: Frame[]) => fs.every((a, i) => fs.every((b, j) => {
+  const p = box(a), q = box(b);
+  return i === j || p.r <= q.x || q.r <= p.x || p.b <= q.y || q.b <= p.y;
+}));
+const DESK = { width: 1440, height: 900 }, PHONE = { width: 393, height: 852 }, TAB = { width: 820, height: 1180 };
+
+test('All grid: one space fills the stage', () => {
+  const stage = { x: 0, y: 0, width: 1200, height: 800 };
+  const [f] = packFrames(stage, [DESK]);
+  assert.ok(f.scale <= 1 && f.scale > 0.7);
+  const b = box(f);
+  assert.ok(b.x >= 16 && b.r <= 1184 && b.y >= 16 && b.b <= 784);
+  assert.ok(b.b - b.y > 800 - 32 - 20 || b.r - b.x > 1200 - 32 - 20, 'touches the limiting side');
+});
+
+test('All grid: 4 equal spaces make 2×2 at the largest scale', () => {
+  const f = packFrames({ x: 0, y: 0, width: 1200, height: 1000 }, [DESK, DESK, DESK, DESK]);
+  assert.equal(new Set(f.map(x => x.scale)).size, 1);
+  assert.deepEqual(f.map(x => x.addr.y), [f[0].addr.y, f[0].addr.y, f[2].addr.y, f[2].addr.y]);
+  assert.ok(f[2].addr.y > f[0].addr.y && f[1].addr.x > f[0].addr.x);
+  // a hair bigger and 2×2 no longer fits either way
+  const s = f[0].scale, w = Math.round(1440 * s), h = Math.round(900 * s) + BAR + ADDR;
+  assert.ok(2 * w + 16 <= 1200 - 32 && 2 * h + 16 <= 1000 - 32);
+  assert.ok(2 * Math.round(1440 * (s + 0.01)) + 16 > 1200 - 32 || 2 * (Math.round(900 * (s + 0.01)) + BAR + ADDR) + 16 > 1000 - 32);
+});
+
+test('All grid: phone, desktop, tablet packed apart, inside, equal gaps, honest sizes', () => {
+  const stage = { x: 0, y: 50, width: 1400, height: 800 };
+  const f = packFrames(stage, [PHONE, DESK, TAB]);
+  assert.ok(apart(f));
+  assert.ok(f.every(x => x.scale === f[0].scale && x.scale <= 1));
+  for (const x of f.map(box)) assert.ok(x.x >= 16 && x.r <= 1400 - 16 && x.y >= 50 + 16 && x.b <= 850 - 16);
+  // one row here: top-aligned, 16px apart, in strip order
+  assert.ok(f.every(x => x.addr.y === f[0].addr.y));
+  assert.equal(box(f[1]).x - box(f[0]).r, 16);
+  assert.equal(box(f[2]).x - box(f[1]).r, 16);
+  assert.ok(Math.abs(f[1].view.width / f[0].view.width - 1440 / 393) < 0.05);
+});
+
+test('All grid: strip order is kept left to right, top to bottom', () => {
+  const f = packFrames({ x: 0, y: 0, width: 900, height: 1000 }, [DESK, PHONE, TAB, PHONE, DESK]);
+  for (let i = 1; i < f.length; i++) {
+    const [p, q] = [box(f[i - 1]), box(f[i])];
+    assert.ok(q.y > p.y ? true : q.y === p.y && q.x > p.x, `space ${i} after ${i - 1}`);
+  }
+  assert.ok(apart(f));
+});
+
+test('All grid: a tiny stage still gives non-overlapping frames at the 0.05 floor', () => {
+  const f = packFrames({ x: 0, y: 0, width: 120, height: 60 }, [DESK, PHONE, TAB, DESK]);
+  assert.ok(f.every(x => x.scale === 0.05));
+  assert.ok(apart(f));
 });
 
 test('All row: one row, equal heights, fits the stage width', () => {

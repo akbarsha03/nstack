@@ -5,7 +5,7 @@ import { app, BrowserWindow, WebContentsView, dialog, ipcMain, nativeImage, type
 import { addPersona, removePersona, parseConfig, ConfigError, type Config } from '../config.js';
 import { parseDevice, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
-import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, inset, reorder } from './spaces.js';
+import { nextSpace, spaceForKey, fitFrames, rowFrames, packFrames, inset, reorder } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
 import { shoot } from './shot.js';
@@ -76,7 +76,7 @@ function layout() {
   // hidden views keep their single-space size so their thumbnails render at a real size
   const frames = !all ? sizes.map(d => fitFrames([inset(stage, 16)], [d])[0])
     : tile === 'row' ? rowFrames(stage, sizes, 16)
-    : fitFrames(tileGrid(stage, names.length, 16), sizes, true);
+    : packFrames(stage, sizes, 16);
   names.forEach((name, i) => {
     const v = views.get(name)!, f = frames[i];
     v.setBounds(f.view);
