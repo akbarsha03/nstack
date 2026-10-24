@@ -31,6 +31,8 @@ export async function emulate(wc: WebContents, d: Device, scale: number) {
   await Promise.all([
     send('Emulation.setDeviceMetricsOverride', {
       width: d.width, height: d.height, deviceScaleFactor: d.dpr, mobile: d.touch, scale, screenWidth: d.width, screenHeight: d.height, dontSetVisibleSize: true,
+      // phones and tablets report how they are held (a rotated one is wider than tall)
+      ...(d.touch && { screenOrientation: d.width > d.height ? { type: 'landscapePrimary', angle: 90 } : { type: 'portraitPrimary', angle: 0 } }),
     }),
     send('Emulation.setTouchEmulationEnabled', { enabled: d.touch, maxTouchPoints: d.touch ? 5 : 1 }),
     send('Emulation.setEmitTouchEventsForMouse', { enabled: d.touch, configuration: 'mobile' }),

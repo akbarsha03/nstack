@@ -137,7 +137,7 @@ nstack.on('frames', frames => {
   $('#frames').innerHTML = frames.filter(f => f.shown).map(f => `<div class="addr" style="left:${f.addr.x}px;top:${f.addr.y}px;width:${f.addr.width}px">
     <input class="url" data-url="${esc(f.name)}" value="${esc(f.url)}" spellcheck="false" autocomplete="off" aria-label="${esc(f.name)} address"><button data-go="${esc(f.name)}" title="Go">Go</button></div>
   <div class="frame" style="left:${f.rect.x}px;top:${f.rect.y}px;width:${f.rect.width}px;height:${f.rect.height}px">
-    <div class="bar" title="${esc(f.name)} · ${esc(f.device)} · ${esc(f.size)}"><span class="lights"><i></i><i></i><i></i></span><span class="label"><b>${esc(f.name)}</b><span class="meta"> · ${esc(f.device)} · ${esc(f.size)}</span></span></div>
+    <div class="bar" title="${esc(f.name)} · ${esc(f.device)} · ${esc(f.size)}"><span class="lights"><i></i><i></i><i></i></span><span class="label"><b>${esc(f.name)}</b><span class="meta"> · ${esc(f.device)} · ${esc(f.size)}</span></span>${f.touch ? `<button class="rot" data-rotate="${esc(f.name)}" title="Rotate to ${f.landscape ? 'portrait' : 'landscape'}">⟳</button>` : ''}</div>
     ${f.out ? `<div class="lo"><b>⊘</b>Logged out<div>run <code>nstack login ${esc(f.name)}</code></div><button class="lb" data-login="${esc(f.name)}">Log in now</button></div>` : ''}</div>`).join('');
 });
 
@@ -155,6 +155,8 @@ $('#frames').addEventListener('keydown', e => {
   i.blur();
 });
 $('#frames').addEventListener('click', e => {
+  const rot = e.target.closest('[data-rotate]');
+  if (rot) return nstack.send('rotate', rot.dataset.rotate);
   const g = e.target.closest('[data-go]');
   if (g) {
     const i = document.querySelector(`input[data-url="${CSS.escape(g.dataset.go)}"]`);

@@ -26,8 +26,8 @@ test('README lists every persona, skipped ones included', () => {
     ],
   });
   assert.match(md, /^# nstack shot · 2026-10-24T01:42:00\.000Z · http:\/\/localhost:3000\n/);
-  assert.match(md, /\| phone-iphone-15-393x852@3x\.png \| phone \| iphone-15 \| 393×852 \| 3 \| 393×852 \| touch \/ mobile UA \| http:\/\/localhost:3000\/p \| ok \|/);
-  assert.match(md, /\| — \| desk \| desktop \| 1440×900 \| 1 \| — \| no touch \/ desktop UA \| .* \| logged out \|/);
+  assert.match(md, /\| phone-iphone-15-393x852@3x\.png \| phone \| iphone-15 \| portrait \| 393×852 \| 3 \| 393×852 \| touch \/ mobile UA \| http:\/\/localhost:3000\/p \| ok \|/);
+  assert.match(md, /\| — \| desk \| desktop \| landscape \| 1440×900 \| 1 \| — \| no touch \/ desktop UA \| .* \| logged out \|/);
   assert.match(md, /Path: `\/p\?a\|b`/);
   assert.match(md, /## How to read these/);
 });

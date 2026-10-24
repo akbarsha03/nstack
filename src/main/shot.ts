@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { BrowserWindow } from 'electron';
 import type { Config } from '../config.js';
-import { parseDevice, PRESETS, type Device } from '../devices.js';
+import { parseDevice, rotated, PRESETS, type Device } from '../devices.js';
 import { emulate, loggedOut } from './persona.js';
 import { partition } from '../aliases.js';
 
@@ -39,10 +39,10 @@ export function manifest(o: { time: Date; baseUrl: string; at?: string; rows: Ro
     '',
     `Path: \`${shotPath(o.at)}\``,
     '',
-    '| File | Persona | Device | Viewport (CSS px) | Pixel ratio | Image size (px) | Touch / mobile UA | URL | Status |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+    '| File | Persona | Device | Orientation | Viewport (CSS px) | Pixel ratio | Image size (px) | Touch / mobile UA | URL | Status |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
     ...o.rows.map(r => '| ' + [
-      r.file ?? '—', r.persona, r.device, `${r.d.width}×${r.d.height}`, `${r.d.dpr}`, r.image ? `${r.image.width}×${r.image.height}` : '—',
+      r.file ?? '—', r.persona, r.device, r.d.width > r.d.height ? 'landscape' : 'portrait', `${r.d.width}×${r.d.height}`, `${r.d.dpr}`, r.image ? `${r.image.width}×${r.image.height}` : '—',
       `${r.d.touch ? 'touch' : 'no touch'} / ${r.d.userAgent ? 'mobile UA' : 'desktop UA'}`, r.url, r.status,
     ].map(cell).join(' | ') + ' |'),
     '',
@@ -59,7 +59,7 @@ export function manifest(o: { time: Date; baseUrl: string; at?: string; rows: Ro
 // `nstack shot`: each persona in its own hidden offscreen window at its real viewport size, so the open spaces are
 // left where they are. Same partition (aliases.ts) = same login. Each run gets its own folder under `shots`
 // (default .nstack/shots): one PNG per persona plus a README.md describing them.
-export async function shoot(config: Config, names: string[], dir: string, at?: string, skip = new Set<string>(), shots = path.join(dir, '.nstack', 'shots')): Promise<Shot[]> {
+export async function shoot(config: Config, names: string[], dir: string, at?: string, skip = new Set<string>(), shots = path.join(dir, '.nstack', 'shots'), landscape = new Set<string>()): Promise<Shot[]> {
   const time = new Date(), show = (p: string) => path.relative(dir, p).startsWith('..') ? p.replace(os.homedir(), '~') : path.relative(dir, p);
   fs.mkdirSync(shots, { recursive: true });
   let run = path.join(shots, runName(time, at));
@@ -69,7 +69,7 @@ export async function shoot(config: Config, names: string[], dir: string, at?: s
   }
   const out: Shot[] = [], rows: Row[] = [];
   for (const name of names) {
-    const device = config.personas[name].device, d = parseDevice(device)!, file = path.join(run, shotFile(name, device, d)), rel = show(file);
+    const device = config.personas[name].device, d = (landscape.has(name) ? rotated : (x: Device) => x)(parseDevice(device)!), file = path.join(run, shotFile(name, device, d)), rel = show(file);
     const url = config.baseUrl.replace(/\/$/, '') + shotPath(at);
     const row = { persona: name, device, d, url };
     const gone = (): Shot => {

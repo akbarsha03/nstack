@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { app, BrowserWindow, WebContentsView, dialog, ipcMain, nativeImage, type Rectangle } from 'electron';
 import { addPersona, removePersona, renamePersona, quickName, parseConfig, ConfigError, type Config } from '../config.js';
-import { parseDevice, PRESETS, type Device } from '../devices.js';
+import { parseDevice, rotated, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
 import { addAlias, partition } from '../aliases.js';
 import { nextSpace, spaceForKey, fitFrames, rowFrames, packFrames, inset, reorder } from './spaces.js';
@@ -29,7 +29,7 @@ let space: string = up.space ?? saved.space ?? names[0];
 if (!spaces().includes(space)) space = names[0];
 let shotDir: string | undefined = typeof saved.shotDir === 'string' ? saved.shotDir : undefined; // last folder the Screenshot button saved to
 let tile: 'grid' | 'row' = saved.tile === 'grid' || saved.tile === 'row' ? saved.tile : config.tile;
-const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs, order: names, shotDir })); } catch {} };
+const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs, order: names, shotDir, landscape: [...landscape] })); } catch {} };
 
 const THUMB_MS = 1500;
 let win: BrowserWindow;
@@ -42,7 +42,10 @@ const devices = new Map<string, Device>();
 const out = new Set<string>(); // personas the app bounced to loginPath
 const base = config.baseUrl.replace(/\/$/, '');
 const home = base + '/'; // every space opens at the app's root
-const size = (name: string) => `${devices.get(name)!.width}×${devices.get(name)!.height}`;
+// phones/tablets turned to landscape with the ⟳ in their frame; devices keeps the config device, dims() what is shown
+const landscape = new Set<string>(Array.isArray(saved.landscape) ? saved.landscape : []);
+const dims = (name: string) => landscape.has(name) ? rotated(devices.get(name)!) : devices.get(name)!;
+const size = (name: string) => `${dims(name).width}×${dims(name).height}`;
 const pad = (s: string, n = 10) => s.padEnd(n);
 const rel = (url: string) => relPath(url, config.baseUrl) ?? url; // what a frame's address bar shows
 
@@ -70,11 +73,11 @@ function log(cmd: string | null, lines: Line[] = []) {
 }
 
 const sendState = () => ready && win.webContents.send('nstack:state', {
-  space, tile, sync: sync.on, syncPrefs: sync.prefs, personas: names.map(n => ({ name: n, device: config.personas[n].device, width: devices.get(n)!.width, height: devices.get(n)!.height, out: out.has(n) })),
+  space, tile, sync: sync.on, syncPrefs: sync.prefs, personas: names.map(n => ({ name: n, device: config.personas[n].device, width: dims(n).width, height: dims(n).height, out: out.has(n) })),
 });
 
 function layout() {
-  const all = space === 'all', sizes = names.map(n => devices.get(n)!);
+  const all = space === 'all', sizes = names.map(dims);
   // native views paint above the page, so keep 48px clear at each side for the stage's ‹ › arrows (32 here + the 16 gap)
   const room = { ...stage, x: stage.x + 32, width: Math.max(0, stage.width - 64) };
   // hidden views keep their single-space size so their thumbnails render at a real size
@@ -85,10 +88,10 @@ function layout() {
     const v = views.get(name)!, f = frames[i];
     v.setBounds(f.view);
     v.setVisible((all || name === space) && !out.has(name) && !covered);
-    emulate(v.webContents, devices.get(name)!, f.scale);
+    emulate(v.webContents, dims(name), f.scale);
   });
   win.webContents.send('nstack:frames', names.map((name, i) => ({
-    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, addr: frames[i].addr, shown: all || name === space, out: out.has(name), url: rel(views.get(name)!.webContents.getURL()),
+    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, addr: frames[i].addr, shown: all || name === space, out: out.has(name), touch: devices.get(name)!.touch, landscape: landscape.has(name), url: rel(views.get(name)!.webContents.getURL()),
   })));
 }
 
@@ -126,6 +129,16 @@ function setPrefs(p: Partial<SyncPrefs>) {
 function setOrder(order: string[]) {
   names.splice(0, names.length, ...reorder(names, Array.isArray(order) ? order : []));
   log(`# order: ${names.join(', ')}`);
+  saveState();
+  layout();
+  sendState();
+}
+
+// ⟳ in a phone's or tablet's frame: portrait ↔ landscape (re-emulated by layout())
+function rotate(name: string) {
+  if (!views.has(name) || !devices.get(name)!.touch) return;
+  if (!landscape.delete(name)) landscape.add(name);
+  log(`# rotate ${name} → ${landscape.has(name) ? 'landscape' : 'portrait'} ${size(name)}`);
   saveState();
   layout();
   sendState();
@@ -192,7 +205,7 @@ function open(name: string): Line {
   });
   views.set(name, v);
   // the DevTools protocol needs a live page to answer, so emulate on a blank one, then go
-  load(name, 'about:blank').then(() => emulate(v.webContents, d, 1)).then(() => load(nameOf.get(v)!, home))
+  load(name, 'about:blank').then(() => emulate(v.webContents, dims(name), 1)).then(() => load(nameOf.get(v)!, home))
     .then(() => v.webContents.navigationHistory.clear()); // no Back to the blank page
   return ['', `${pad(name)} ${pad(config.personas[name].device, 9)} ${pad(size(name), 9)} → ${home}`];
 }
@@ -217,7 +230,7 @@ function removed(name: string): Line[] {
   const v = views.get(name);
   if (!v && !names.includes(name)) throw new ConfigError(`${name} is not open here`);
   if (v) { win.contentView.removeChildView(v); v.webContents.close(); nameOf.delete(v); }
-  views.delete(name); devices.delete(name); out.delete(name); delete config.personas[name];
+  views.delete(name); devices.delete(name); out.delete(name); landscape.delete(name); delete config.personas[name];
   if (names.includes(name)) names.splice(names.indexOf(name), 1);
   const { [name]: _, ...follow } = sync.prefs.follow;
   sync.setPrefs({ follow });
@@ -235,6 +248,7 @@ function renamed(from: string, to: string): Line[] {
   move(views); move(devices);
   nameOf.set(views.get(to)!, to);
   if (out.delete(from)) out.add(to);
+  if (landscape.delete(from)) landscape.add(to);
   config.personas[to] = config.personas[from];
   delete config.personas[from];
   names[names.indexOf(from)] = to;
@@ -279,7 +293,7 @@ async function shot(at?: string, to?: string) {
   if (shooting) throw new Error('a shot is already running');
   shooting = true;
   try {
-    const shots = await shoot(config, names, dir, at, out, to);
+    const shots = await shoot(config, names, dir, at, out, to, landscape);
     log(`nstack shot${at ? ' ' + at : ''}`, shots.map(s => [s.status === 'ok' ? 'ok' : 'bad', s.line]));
     return shots;
   } finally {
@@ -312,6 +326,7 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:go', (_e, id: string) => goTo(id));
   ipcMain.on('nstack:key', (_e, key: string) => onKey(key));
   ipcMain.on('nstack:reorder', (_e, order: string[]) => setOrder(order));
+  ipcMain.on('nstack:rotate', (_e, name: string) => rotate(name));
   ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));
   ipcMain.on('nstack:sync', () => setSync(!sync.on));
   ipcMain.on('nstack:syncprefs', (_e, p: Partial<SyncPrefs>) => setPrefs(p ?? {}));

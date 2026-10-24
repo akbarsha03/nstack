@@ -19,3 +19,6 @@ export function parseDevice(s: string): Device | undefined {
   const m = /^(\d{2,4})x(\d{2,4})$/.exec(s);
   if (m) return { width: Number(m[1]), height: Number(m[2]), dpr: 1, touch: false };
 }
+
+// the same device turned on its side: width and height swap, everything else (dpr, touch, user agent) stays
+export const rotated = (d: Device): Device => ({ ...d, width: d.height, height: d.width });
