@@ -22,13 +22,15 @@ export function keepSessionCookies(wc: WebContents) {
 // viewport, DPR, mobile viewport rules and touch at the given on-screen scale, through the DevTools protocol (what
 // Chrome's device toolbar does). enableDeviceEmulation ignores <meta viewport> here, so phones lay out at 980px.
 // Await it before the first load: touch support is fixed when a document is created. Call again when the scale changes.
+// dontSetVisibleSize: without it Chromium resizes the render widget to the unscaled device size; Linux clips that to the
+// view's bounds, macOS does not, so the page painted past its frame over the shell. The view stays at bounds = device × scale.
 export async function emulate(wc: WebContents, d: Device, scale: number) {
   const dbg = wc.debugger;
   try { if (!dbg.isAttached()) dbg.attach('1.3'); } catch { return; }
   const send = (cmd: string, params: object) => dbg.sendCommand(cmd, params).catch(() => {});
   await Promise.all([
     send('Emulation.setDeviceMetricsOverride', {
-      width: d.width, height: d.height, deviceScaleFactor: d.dpr, mobile: d.touch, scale, screenWidth: d.width, screenHeight: d.height,
+      width: d.width, height: d.height, deviceScaleFactor: d.dpr, mobile: d.touch, scale, screenWidth: d.width, screenHeight: d.height, dontSetVisibleSize: true,
     }),
     send('Emulation.setTouchEmulationEnabled', { enabled: d.touch, maxTouchPoints: d.touch ? 5 : 1 }),
     send('Emulation.setEmitTouchEventsForMouse', { enabled: d.touch, configuration: 'mobile' }),
