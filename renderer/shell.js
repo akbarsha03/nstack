@@ -52,11 +52,13 @@ const isOpen = () => document.querySelector('.scrim.open, .drawer.open');
 function show(sel) {
   lastFocus = document.activeElement;
   $(sel).classList.add('open');
+  document.body.classList.add('covered');
   nstack.send('covered', true);
 }
 function closeAll() {
   if (!isOpen()) return;
   document.querySelectorAll('.scrim.open, .drawer.open').forEach(el => el.classList.remove('open'));
+  document.body.classList.remove('covered');
   nstack.send('covered', false);
   if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
 }
@@ -93,6 +95,7 @@ nstack.on('state', s => {
   syncPrefs = s.syncPrefs;
   chips();
   strip();
+  $('#b-prev').hidden = $('#b-next').hidden = !personas.length; // All + one persona is still two spaces
   document.querySelectorAll('[data-tile]').forEach(b => b.classList.toggle('on', b.dataset.tile === s.tile));
   $('.seg').classList.toggle('off', space !== 'all');
   $('#b-sync').classList.toggle('on', s.sync);
@@ -214,6 +217,8 @@ $('#spf-form').addEventListener('submit', e => {
 });
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeAll));
 document.querySelectorAll('.scrim').forEach(s => s.addEventListener('click', e => { if (e.target === s) closeAll(); }));
+$('#b-prev').onclick = () => nstack.send('key', 'ArrowLeft');
+$('#b-next').onclick = () => nstack.send('key', 'ArrowRight');
 $('#b-up').onclick = () => nstack.send('up');
 $('#b-login').onclick = () => nstack.send('login');
 $('#b-shot').onclick = () => { $('#b-shot').disabled = true; nstack.send('shot'); };

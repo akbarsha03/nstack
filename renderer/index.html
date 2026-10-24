@@ -53,7 +53,13 @@ button.on{border-color:var(--acc);color:var(--acc)}
 .sp-l small{color:var(--dim)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);flex:none}
 .keys{margin-left:auto;align-self:center;font:11px var(--mono);color:var(--dim);white-space:nowrap;padding-left:12px}
-main{flex:1}
+main{flex:1;position:relative}
+/* ‹ › on the stage edges: step through spaces (main keeps 48px clear of native views on each side) */
+.nav{position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:44px;height:120px;padding:0;border:0;border-radius:22px;background:none;
+  color:var(--dim);font:300 54px/1 var(--sans)}
+.nav:hover{background:var(--panel);color:var(--text);border:0}
+#b-prev{left:2px}#b-next{right:2px}
+.covered .nav,.nav[hidden]{display:none}
 .sp.out .dot{background:var(--bad);box-shadow:0 0 6px var(--bad)}
 .sp.out .mini{opacity:.35}
 /* persona frames; the page itself is a native view main.ts lays over the area under .bar */
@@ -141,7 +147,7 @@ main{flex:1}
   <button class="ymlbtn" id="b-yml">nstack.yml</button>
 </div>
 <nav class="spaces" id="spaces" aria-label="Spaces"></nav>
-<main id="stage"></main>
+<main id="stage"><button class="nav" id="b-prev" title="Previous space (←)" aria-label="Previous space">‹</button><button class="nav" id="b-next" title="Next space (→)" aria-label="Next space">›</button></main>
 <div class="term" id="term">
   <button class="th" id="b-term"><span class="caret">&#9662;</span> terminal <span class="grow"></span><span id="dir"></span></button>
   <div class="log" id="log" aria-live="polite"></div>

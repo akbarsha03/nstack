@@ -73,10 +73,12 @@ const sendState = () => ready && win.webContents.send('nstack:state', {
 
 function layout() {
   const all = space === 'all', sizes = names.map(n => devices.get(n)!);
+  // native views paint above the page, so keep 48px clear at each side for the stage's ‹ › arrows (32 here + the 16 gap)
+  const room = { ...stage, x: stage.x + 32, width: Math.max(0, stage.width - 64) };
   // hidden views keep their single-space size so their thumbnails render at a real size
-  const frames = !all ? sizes.map(d => fitFrames([inset(stage, 16)], [d])[0])
-    : tile === 'row' ? rowFrames(stage, sizes, 16)
-    : packFrames(stage, sizes, 16);
+  const frames = !all ? sizes.map(d => fitFrames([inset(room, 16)], [d])[0])
+    : tile === 'row' ? rowFrames(room, sizes, 16)
+    : packFrames(room, sizes, 16);
   names.forEach((name, i) => {
     const v = views.get(name)!, f = frames[i];
     v.setBounds(f.view);

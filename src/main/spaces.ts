@@ -1,8 +1,8 @@
 export type Rect = { x: number; y: number; width: number; height: number };
 
-// ← / → walk the strip order (All first), clamped at both ends like the mock
+// ← / → and the stage's ‹ › walk the strip order (All first), wrapping around at both ends
 export const nextSpace = (spaces: string[], cur: string, d: number) =>
-  spaces[Math.max(0, Math.min(spaces.length - 1, spaces.indexOf(cur) + d))];
+  spaces[(((spaces.indexOf(cur) + d) % spaces.length) + spaces.length) % spaces.length];
 
 // 0 or a = All, 1–9 = nth persona
 export function spaceForKey(names: string[], key: string): string | undefined {
