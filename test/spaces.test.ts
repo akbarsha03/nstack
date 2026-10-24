@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, BAR } from '../src/main/spaces.js';
+import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, reorder, BAR } from '../src/main/spaces.js';
 
 test('grid tiles 3 personas as 2x2 inside the stage', () => {
   const r = tileGrid({ x: 0, y: 100, width: 1000, height: 600 }, 3);
@@ -61,4 +61,10 @@ test('All row: one row, equal heights, fits the stage width', () => {
   // a short stage: height is the limit, never upscaled past the smallest device
   const [one] = rowFrames({ x: 0, y: 0, width: 5000, height: 5000 }, [{ width: 393, height: 852 }]);
   assert.equal(one.view.height, 852);
+});
+
+test('reorder follows the given order, drops unknowns, keeps the rest at the end', () => {
+  assert.deepEqual(reorder(['admin', 'storage', 'customer'], ['customer', 'admin']), ['customer', 'admin', 'storage']);
+  assert.deepEqual(reorder(['admin', 'storage'], ['gone', 'storage', 'storage']), ['storage', 'admin']);
+  assert.deepEqual(reorder(['admin', 'storage'], []), ['admin', 'storage']);
 });

@@ -22,6 +22,10 @@ export function spaceForKey(names: string[], key: string): string | undefined {
   if (/^[1-9]$/.test(key)) return names[Number(key) - 1];
 }
 
+// strip order: the names in `order` first (unknown ones dropped), then any it leaves out, in their old order
+export const reorder = (names: string[], order: string[]) =>
+  [...new Set(order.filter(n => names.includes(n))), ...names.filter(n => !order.includes(n))];
+
 export const BAR = 24; // frame title bar height, matches .frame .bar in renderer/index.html
 export type Frame = { frame: Rect; view: Rect; scale: number };
 

@@ -80,7 +80,7 @@ Run `login` and `reset` while `nstack up` is closed. `nstack <command> --help` l
 
 ## The shell
 
-- **Spaces.** One persona fills the view, scaled to fit with its true aspect ratio; the strip shows a live thumbnail of each. Switch with a click, ← / →, `1`–`9`; `0` or `a` is the **All** space, every persona tiled (`grid` keeps relative sizes honest, `row` gives one shared height). The **+** tile adds a persona. Each frame's title bar has an address bar: type a path (or a full URL) and press Enter to take that persona there; with Sync on the others follow.
+- **Spaces.** One persona fills the view, scaled to fit with its true aspect ratio; the strip shows a live thumbnail of each. Switch with a click, ← / →, `1`–`9`; `0` or `a` is the **All** space, every persona tiled (`grid` keeps relative sizes honest, `row` gives one shared height). The **+** tile adds a persona; drag a tile to reorder the strip (the order is remembered, and `1`–`9` follow it). Each frame's title bar has an address bar: type a path (or a full URL) and press Enter to take that persona there; with Sync on the others follow.
 - **Control bar.** Persona chips (red dot = logged out, click to log in; green = click to forget the session), **Up** (every persona back to its start page), **Login** (the first logged-out persona), **Shot**, **Sync**, `grid` / `row`, and a read-only `nstack.yml` drawer. The last space, Sync and tile mode are remembered.
 - **Terminal pane.** Echoes every action as the CLI line it stands for; click its header to collapse it.
 - **Logged out.** A persona the app bounces to `loginPath` shows a placeholder telling you to run `nstack login <persona>`.

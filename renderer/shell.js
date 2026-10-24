@@ -16,8 +16,8 @@ function strip() {
   $('#spaces').innerHTML =
     `<button class="sp" data-space="all" title="All windows (0 or a)"><span class="mini allmini">${personas.map(p =>
       `<i style="width:${Math.round(p.width * k)}px;height:${Math.round(p.height * k)}px"></i>`).join('')}</span><span class="sp-l">All</span></button>` +
-    personas.map((p, i) => `<button class="sp ${p.out ? 'out' : ''}" data-space="${esc(p.name)}" title="${esc(p.name)} · ${esc(p.device)} ${p.width}×${p.height} (${i + 1})">
-      <img class="mini" alt="" ${thumbs[p.name] ? `src="${thumbs[p.name]}"` : ''}><span class="sp-l"><span class="dot"></span>${esc(p.name)} <small>${esc(p.device)}</small></span></button>`).join('') +
+    personas.map((p, i) => `<button class="sp ${p.out ? 'out' : ''}" data-space="${esc(p.name)}" draggable="true" title="${esc(p.name)} · ${esc(p.device)} ${p.width}×${p.height} (${i + 1})">
+      <img class="mini" alt="" draggable="false" ${thumbs[p.name] ? `src="${thumbs[p.name]}"` : ''}><span class="sp-l"><span class="dot"></span>${esc(p.name)} <small>${esc(p.device)}</small></span></button>`).join('') +
     `<button class="sp add" id="b-add" title="Add space"><span class="mini">+</span><span class="sp-l"><small>Add space</small></span></button>
      <span class="keys">← → · 1–9 · 0 = All</span>`;
   document.querySelectorAll('.sp[data-space]').forEach(b => b.classList.toggle('cur', b.dataset.space === space));
@@ -152,6 +152,31 @@ $('#spaces').addEventListener('click', e => {
   const b = e.target.closest('[data-space]');
   if (b) nstack.send('go', b.dataset.space);
 });
+// drag a persona tile onto another to reorder the strip (All and Add space stay put)
+let dragging = null;
+const clearDrop = () => document.querySelectorAll('.drop-before, .drop-after').forEach(el => el.classList.remove('drop-before', 'drop-after'));
+$('#spaces').addEventListener('dragstart', e => {
+  dragging = e.target.closest?.('.sp[draggable="true"]')?.dataset.space ?? null;
+  if (dragging) e.dataTransfer.effectAllowed = 'move';
+});
+$('#spaces').addEventListener('dragover', e => {
+  const b = e.target.closest?.('.sp[draggable="true"]');
+  clearDrop();
+  if (!dragging || !b || b.dataset.space === dragging) return;
+  e.preventDefault();
+  const r = b.getBoundingClientRect();
+  b.classList.add(e.clientX < r.x + r.width / 2 ? 'drop-before' : 'drop-after');
+});
+$('#spaces').addEventListener('drop', e => {
+  const b = e.target.closest?.('.drop-before, .drop-after');
+  if (!dragging || !b) return;
+  e.preventDefault();
+  const order = personas.map(p => p.name).filter(n => n !== dragging);
+  order.splice(order.indexOf(b.dataset.space) + (b.classList.contains('drop-after') ? 1 : 0), 0, dragging);
+  clearDrop();
+  nstack.send('reorder', order);
+});
+$('#spaces').addEventListener('dragend', () => { dragging = null; clearDrop(); });
 $('#ad-name').addEventListener('input', e => e.target.setCustomValidity(['all', ...personas.map(p => p.name)].includes(e.target.value.trim()) ? 'that space already exists' : ''));
 $('#ad-form').addEventListener('submit', e => {
   e.preventDefault();

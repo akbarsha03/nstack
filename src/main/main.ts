@@ -5,7 +5,7 @@ import { app, BrowserWindow, WebContentsView, ipcMain, nativeImage, type Rectang
 import { addPersona, parseConfig, ConfigError, type Config } from '../config.js';
 import { parseDevice, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
-import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, inset } from './spaces.js';
+import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, inset, reorder } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
 import { shoot } from './shot.js';
@@ -14,19 +14,20 @@ import { createSync, relPath, type SyncPrefs } from './sync.js';
 type Persona = Config['personas'][string];
 const up = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string; file: string; space?: string; sync?: boolean };
 const { config, dir, file } = up;
-const names = [...up.names]; // grows with `nstack add` / the + tile
 const nstackDir = path.join(dir, '.nstack');
 // per-project profile: each persona's `persist:<name>` partition (cookies, storage) lives under here
 app.setPath('userData', path.join(nstackDir, 'electron'));
 
-// last space, tile mode, Sync and its prefs survive restarts
+// last space, tile mode, Sync and its prefs, and the strip order survive restarts
 const stateFile = path.join(nstackDir, 'state.json');
 const saved = (() => { try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { return {}; } })();
+// strip order (dragged in the strip, saved); grows with `nstack add` / the + tile
+const names = reorder(up.names, Array.isArray(saved.order) ? saved.order : []);
 const spaces = () => ['all', ...names];
 let space: string = up.space ?? saved.space ?? names[0];
 if (!spaces().includes(space)) space = names[0];
 let tile: 'grid' | 'row' = saved.tile === 'grid' || saved.tile === 'row' ? saved.tile : config.tile;
-const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs })); } catch {} };
+const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs, order: names })); } catch {} };
 
 const THUMB_MS = 1500;
 let win: BrowserWindow;
@@ -114,6 +115,14 @@ function setPrefs(p: Partial<SyncPrefs>) {
   const { query, leaderOnlyCurrent, follow } = sync.prefs;
   log(`# sync prefs: query ${query ? 'on' : 'off'} · leader ${leaderOnlyCurrent ? 'current' : 'any'} · follow ${names.filter(n => follow[n] !== false).join(',') || 'none'}`);
   saveState();
+  sendState();
+}
+
+function setOrder(order: string[]) {
+  names.splice(0, names.length, ...reorder(names, Array.isArray(order) ? order : []));
+  log(`# order: ${names.join(', ')}`);
+  saveState();
+  layout();
   sendState();
 }
 
@@ -255,6 +264,7 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:stage', (_e, r: Rectangle) => { stage = r; layout(); });
   ipcMain.on('nstack:go', (_e, id: string) => goTo(id));
   ipcMain.on('nstack:key', (_e, key: string) => onKey(key));
+  ipcMain.on('nstack:reorder', (_e, order: string[]) => setOrder(order));
   ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));
   ipcMain.on('nstack:sync', () => setSync(!sync.on));
   ipcMain.on('nstack:syncprefs', (_e, p: Partial<SyncPrefs>) => setPrefs(p ?? {}));
