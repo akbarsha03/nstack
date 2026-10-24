@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { app, BrowserWindow, WebContentsView, dialog, ipcMain, nativeImage, type Rectangle } from 'electron';
-import { addPersona, removePersona, renamePersona, parseConfig, ConfigError, type Config } from '../config.js';
+import { addPersona, removePersona, renamePersona, quickName, parseConfig, ConfigError, type Config } from '../config.js';
 import { parseDevice, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
 import { addAlias, partition } from '../aliases.js';
@@ -332,14 +332,16 @@ app.whenReady().then(() => {
     if (who && views.has(who)) logIn(who);
     else log('nstack login --all', [['ok', `all ${names.length} sessions valid, nothing to do`]]);
   });
-  ipcMain.on('nstack:add', (_e, a: { name: string; device: string; login: boolean }) => {
+  // no name = a device shape clicked in the + dialog: pick a free one
+  ipcMain.on('nstack:add', (_e, a: { name?: string; device: string; login: boolean }) => {
+    a.name ||= quickName(a.device, [...names, ...Object.keys(config.personas)]);
     try {
       const { text, persona } = addPersona(fs.readFileSync(file, 'utf8'), a.name, { device: a.device }, path.basename(file));
       fs.writeFileSync(file, text);
-      added(a.name, persona);
-      if (a.login) logIn(a.name);
+      added(a.name!, persona);
+      if (a.login) logIn(a.name!);
     } catch (e) {
-      log(addCmd(a.name, a), [['bad', (e as Error).message]]);
+      log(addCmd(a.name!, a), [['bad', (e as Error).message]]);
     }
   });
   // Screenshot button: ask for a folder first (native views would paint over the dialog, so hide them meanwhile)

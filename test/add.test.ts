@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addPersona, parseConfig, ConfigError } from '../src/config.js';
+import { addPersona, parseConfig, ConfigError, quickName } from '../src/config.js';
 
 const SPEC = `# nstack.yml
 baseUrl: http://localhost:3000
@@ -47,4 +47,12 @@ test('rejects bad names, devices and duplicates', () => {
   bad('cashier', { device: 'galaxy' }, /unknown device/);
   bad('admin', { device: 'desktop' }, /admin is already in nstack\.yml/);
   assert.throws(() => addPersona('baseUrl: [x', 'a', { device: 'desktop' }), /not valid YAML/);
+});
+
+test('quickName: the preset\'s first word, suffixed until free', () => {
+  assert.deepEqual(['iphone-15', 'pixel-8', 'ipad-air', 'laptop', 'desktop'].map(p => quickName(p, [])), ['iphone', 'pixel', 'ipad', 'laptop', 'desktop']);
+  assert.equal(quickName('iphone-15', ['iphone']), 'iphone-2');
+  assert.equal(quickName('iphone-15', ['iphone', 'iphone-2', 'iphone-3']), 'iphone-4');
+  assert.equal(quickName('1366x768', []), 'space');
+  assert.equal(quickName('1366x768', ['space']), 'space-2');
 });

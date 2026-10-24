@@ -94,6 +94,9 @@ nstack.on('init', s => {
   $('#dir').textContent = s.dir;
   document.querySelectorAll('.yml-name').forEach(el => { el.textContent = s.file; });
   $('#b-yml').textContent = s.file;
+  // the + dialog's quick start: one device shape per preset, same sizing as the strip thumbnails
+  $('#ad-quick').innerHTML = s.presets.map(([k, w, h]) => { const [bw, bh] = shape(w, h); return `<button type="button" class="qk" data-quick="${esc(k)}" title="Add a ${esc(k)} space now">
+    <span class="mini dev ${w > h ? 'wide' : ''}" style="width:${bw}px;height:${bh}px"></span>${esc(k)}<small>${w}×${h}</small></button>`; }).join('');
   $('#ad-dev').innerHTML = s.presets.map(([k, w, h]) => `<option value="${esc(k)}">${esc(k)} · ${w}×${h}</option>`).join('');
 });
 nstack.on('state', s => {
@@ -248,6 +251,12 @@ $('#spaces').addEventListener('drop', e => {
 });
 $('#spaces').addEventListener('dragend', () => { dragging = null; clearDrop(); });
 $('#ad-name').addEventListener('input', e => e.target.setCustomValidity(['all', ...personas.map(p => p.name)].includes(e.target.value.trim()) ? 'that space already exists' : ''));
+$('#ad-quick').addEventListener('click', e => {
+  const q = e.target.closest('[data-quick]');
+  if (!q) return;
+  closeAll();
+  nstack.send('add', { device: q.dataset.quick, login: false }); // main picks a free name (iphone, iphone-2, …)
+});
 $('#ad-form').addEventListener('submit', e => {
   e.preventDefault();
   const add = { name: $('#ad-name').value.trim(), device: $('#ad-dev').value, login: $('#ad-in').checked };

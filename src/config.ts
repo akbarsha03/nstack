@@ -157,3 +157,13 @@ export function renamePersona(text: string, from: string, to: string, file = 'ns
   if (JSON.stringify(YAML.parse(out)?.personas ?? {}) !== JSON.stringify(want)) throw new ConfigError(`could not rename ${from} in ${file} safely; rename it by hand`);
   return out;
 }
+
+// the + dialog's one-click add: a preset's first word without digits (iphone-15 → iphone, ipad-air → ipad), then -2, -3…
+// until it is free; anything that would not be a valid name falls back to "space"
+export function quickName(preset: string, taken: string[]): string {
+  const first = preset.split('-')[0].replace(/\d+/g, '');
+  const base = /^[a-z]{2,13}$/.test(first) ? first : 'space'; // 1366x768 → x → space
+  let name = base;
+  for (let i = 2; taken.includes(name) || name === 'all'; i++) name = `${base}-${i}`;
+  return name;
+}
