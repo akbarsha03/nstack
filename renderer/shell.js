@@ -121,7 +121,7 @@ nstack.on('shots', shots => {
 nstack.on('frames', frames => {
   for (const f of frames) urls[f.name] = f.url;
   $('#frames').innerHTML = frames.filter(f => f.shown).map(f => `<div class="frame" style="left:${f.rect.x}px;top:${f.rect.y}px;width:${f.rect.width}px;height:${f.rect.height}px">
-    <div class="bar" title="${esc(f.name)} · ${esc(f.device)} · ${esc(f.size)}"><span class="lights"><i></i><i></i><i></i></span><span><b>${esc(f.name)}</b> · ${esc(f.device)} · ${esc(f.size)}</span>
+    <div class="bar" title="${esc(f.name)} · ${esc(f.device)} · ${esc(f.size)}"><span class="lights"><i></i><i></i><i></i></span><span class="label"><b>${esc(f.name)}</b><span class="meta"> · ${esc(f.device)} · ${esc(f.size)}</span></span>
       <input class="url" data-url="${esc(f.name)}" value="${esc(f.url)}" spellcheck="false" autocomplete="off" aria-label="${esc(f.name)} address"></div>
     ${f.out ? `<div class="lo"><b>⊘</b>Logged out<div>run <code>nstack login ${esc(f.name)}</code></div><button class="lb" data-login="${esc(f.name)}">Log in now</button></div>` : ''}</div>`).join('');
 });
