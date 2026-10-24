@@ -34,7 +34,11 @@ button.on{border-color:var(--acc);color:var(--acc)}
 .seg button:last-child{border-radius:0 5px 5px 0;margin-left:-1px}
 .seg.off button{opacity:.45}
 .ymlbtn{font:11px var(--mono);color:var(--dim)}
-.spaces{display:flex;gap:6px;padding:8px 14px;background:#0f1318;border-bottom:1px solid var(--line);overflow-x:auto;flex:none;align-items:flex-end}
+/* spaces strip: a .th header like the terminal's collapses it to one thin bar; main lays the stage out again */
+.strip{flex:none;background:#0f1318;border-bottom:1px solid var(--line)}
+.strip > .th{padding:2px 14px;font:11px var(--mono)}
+.strip.closed .spaces{display:none}
+.spaces{display:flex;gap:6px;padding:4px 14px 8px;overflow-x:auto;align-items:flex-end}
 .sp{display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 8px;border-radius:8px;background:none;border:1px solid transparent;flex:none}
 .sp:hover{background:var(--panel)}
 .sp{position:relative}
@@ -101,7 +105,7 @@ main{flex:1;position:relative}
 .th{display:flex;align-items:center;gap:8px;padding:4px 14px;color:var(--dim);cursor:pointer;user-select:none;border:0;background:none;width:100%;text-align:left;border-radius:0}
 .th:hover{color:var(--text)}
 .th .caret{transition:transform .2s}
-.term.closed .caret{transform:rotate(-90deg)}
+.closed > .th .caret{transform:rotate(-90deg)}
 .log{height:150px;overflow:auto;padding:4px 14px 10px;white-space:pre;border-top:1px solid var(--line)}
 .term.closed .log{display:none}
 .unread{font-size:10px;color:#04201b;background:var(--acc);border-radius:99px;padding:0 6px}
@@ -170,7 +174,10 @@ main{flex:1;position:relative}
   <span class="sep"></span>
   <button class="ymlbtn" id="b-yml">nstack.yml</button>
 </div>
-<nav class="spaces" id="spaces" aria-label="Spaces"></nav>
+<div class="strip" id="strip">
+  <button class="th" id="b-strip" aria-controls="spaces" aria-expanded="true"><span class="caret">&#9662;</span> spaces <small id="spsum"></small></button>
+  <nav class="spaces" id="spaces" aria-label="Spaces"></nav>
+</div>
 <main id="stage"><div class="hscroll" id="hscroll" hidden><i id="hthumb"></i></div><button class="nav" id="b-prev" title="Previous space (←)" aria-label="Previous space">‹</button><button class="nav" id="b-next" title="Next space (→)" aria-label="Next space">›</button></main>
 <div class="term closed" id="term">
   <button class="th" id="b-term"><span class="caret">&#9662;</span> terminal <span class="unread" id="unread" hidden></span><span class="grow"></span><span id="dir"></span></button>

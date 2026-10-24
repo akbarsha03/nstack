@@ -30,6 +30,11 @@ function strip() {
      <span class="keys">← → · 1–9 · 0 = All</span>`;
   document.querySelectorAll('.sp[data-space]').forEach(b => b.classList.toggle('cur', b.dataset.space === space));
   document.querySelector('.sp.cur')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  $('#spsum').textContent = `(${personas.length}) · ${space}`;
+}
+function setStrip(open) {
+  $('#strip').classList.toggle('closed', !open);
+  $('#b-strip').setAttribute('aria-expanded', open);
 }
 
 let unread = 0;
@@ -97,6 +102,7 @@ function openPrefs() {
 
 nstack.on('init', s => {
   setTerm(s.term);
+  setStrip(s.strip);
   $('#ver').textContent = s.version;
   $('#base').textContent = s.baseUrl;
   $('#dir').textContent = s.dir;
@@ -321,6 +327,7 @@ $('#b-syncprefs').onclick = openPrefs;
 $('#b-yml').onclick = () => { nstack.send('yml'); show('#yml'); };
 document.querySelectorAll('[data-tile]').forEach(b => b.onclick = () => nstack.send('tile', b.dataset.tile));
 // #stage shrinks or grows, the observer below re-lays out; main remembers the choice
+$('#b-strip').onclick = () => { const open = $('#strip').classList.contains('closed'); setStrip(open); nstack.send('strip', open); };
 $('#b-term').onclick = () => { const open = $('#term').classList.contains('closed'); setTerm(open); nstack.send('term', open); };
 
 document.addEventListener('keydown', e => {

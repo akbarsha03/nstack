@@ -29,8 +29,9 @@ let space: string = up.space ?? saved.space ?? names[0];
 if (!spaces().includes(space)) space = names[0];
 let shotDir: string | undefined = typeof saved.shotDir === 'string' ? saved.shotDir : undefined; // last folder the Screenshot button saved to
 let term = saved.term === true; // terminal pane open; starts collapsed
+let strip = saved.strip !== false; // spaces strip open; starts expanded
 let tile: 'grid' | 'row' = saved.tile === 'grid' || saved.tile === 'row' ? saved.tile : config.tile;
-const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs, order: names, shotDir, landscape: [...landscape], term })); } catch {} };
+const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs, order: names, shotDir, landscape: [...landscape], term, strip })); } catch {} };
 
 const THUMB_MS = 1500;
 let win: BrowserWindow;
@@ -393,7 +394,7 @@ app.whenReady().then(() => {
     ready = true;
     win.webContents.send('nstack:init', {
       version: pkg.version, baseUrl: config.baseUrl, file: path.basename(file), dir: dir.replace(os.homedir(), '~'),
-      presets: Object.entries(PRESETS).map(([k, d]) => [k, d.width, d.height]), term,
+      presets: Object.entries(PRESETS).map(([k, d]) => [k, d.width, d.height]), term, strip,
     });
     win.webContents.send('nstack:log', history);
     goTo(space);
@@ -403,6 +404,7 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:key', (_e, key: string) => onKey(key));
   ipcMain.on('nstack:reorder', (_e, order: string[]) => setOrder(order));
   ipcMain.on('nstack:term', (_e, open: boolean) => { term = open === true; saveState(); });
+  ipcMain.on('nstack:strip', (_e, open: boolean) => { strip = open === true; saveState(); });
   // the stage's scrollbar (absolute x) and sideways swipes / Shift+wheel, from the shell page or inside a persona's page
   ipcMain.on('nstack:scroll', (_e, x: number) => scrollTo(Number(x)));
   ipcMain.on('nstack:wheel', (_e, w: { dx: number; dy: number; shift: boolean }) => {
