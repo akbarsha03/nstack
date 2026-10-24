@@ -43,6 +43,9 @@ button.on{border-color:var(--acc);color:var(--acc)}
 .sp-x:hover{color:var(--bad);border-color:var(--bad)}
 .sp.cur{border-color:var(--acc);background:var(--panel2)}
 .mini{height:62px;min-width:62px;overflow:hidden;border-radius:4px;background:#fff;box-shadow:0 0 0 1px var(--line);display:block}
+/* a persona's live preview: shell.js sizes the box to the device's ratio inside the 62px slot; the thumb never stretches */
+.mini.dev{min-width:0;border-radius:2px;border:1px solid var(--line);box-shadow:none;background:#64748b;object-fit:contain}
+.mini.dev.wide{border:0}
 .sp.drop-before{box-shadow:-3px 0 0 var(--acc)}
 .sp.drop-after{box-shadow:3px 0 0 var(--acc)}
 .sp.cur .mini{box-shadow:0 0 0 2px var(--acc)}
