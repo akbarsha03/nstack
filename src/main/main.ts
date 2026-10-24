@@ -84,7 +84,7 @@ function layout() {
     emulate(v.webContents, devices.get(name)!, f.scale);
   });
   win.webContents.send('nstack:frames', names.map((name, i) => ({
-    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, shown: all || name === space, out: out.has(name), url: rel(views.get(name)!.webContents.getURL()),
+    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, addr: frames[i].addr, shown: all || name === space, out: out.has(name), url: rel(views.get(name)!.webContents.getURL()),
   })));
 }
 

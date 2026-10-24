@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, reorder, BAR } from '../src/main/spaces.js';
+import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, reorder, BAR, ADDR } from '../src/main/spaces.js';
 
 test('grid tiles 3 personas as 2x2 inside the stage', () => {
   const r = tileGrid({ x: 0, y: 100, width: 1000, height: 600 }, 3);
@@ -28,13 +28,14 @@ test('digit keys pick a persona, 0 and a pick All', () => {
 });
 
 test('fitFrames keeps true aspect ratio, never upscales, centres in the cell', () => {
-  const cell = { x: 0, y: 0, width: 1000, height: 624 };
+  const cell = { x: 0, y: 0, width: 1000, height: 600 + BAR + ADDR };
   const [phone] = fitFrames([cell], [{ width: 412, height: 915 }]);
   assert.equal(phone.scale, 600 / 915);
   assert.equal(phone.view.height, 600);
   assert.equal(phone.view.width, Math.round(412 * 600 / 915));
-  assert.equal(phone.frame.y, 0);
-  assert.equal(phone.view.y, BAR);
+  assert.deepEqual(phone.addr, { x: phone.frame.x, y: 0, width: phone.frame.width, height: 26 });
+  assert.equal(phone.frame.y, ADDR);
+  assert.equal(phone.view.y, ADDR + BAR);
   assert.equal(phone.frame.x, Math.floor((1000 - phone.view.width) / 2));
   const [small] = fitFrames([{ x: 0, y: 0, width: 3000, height: 3000 }], [{ width: 393, height: 852 }]);
   assert.equal(small.scale, 1);
@@ -53,7 +54,8 @@ test('All row: one row, equal heights, fits the stage width', () => {
   const stage = { x: 0, y: 50, width: 1200, height: 800 };
   const f = rowFrames(stage, [{ width: 1440, height: 900 }, { width: 412, height: 915 }, { width: 820, height: 1180 }]);
   assert.equal(new Set(f.map(x => x.view.height)).size, 1);
-  assert.ok(f.every(x => x.frame.y === f[0].frame.y && x.view.y === x.frame.y + BAR));
+  assert.ok(f.every(x => x.frame.y === f[0].frame.y && x.view.y === x.frame.y + BAR && x.addr.y === x.frame.y - ADDR && x.addr.width === x.frame.width));
+  assert.ok(f[0].addr.y >= stage.y && f[0].frame.y + f[0].frame.height <= stage.y + stage.height);
   for (let i = 1; i < f.length; i++) assert.ok(f[i].frame.x >= f[i - 1].frame.x + f[i - 1].frame.width);
   const last = f[f.length - 1].frame;
   assert.ok(f[0].frame.x >= 8 && last.x + last.width <= 1200 - 8);

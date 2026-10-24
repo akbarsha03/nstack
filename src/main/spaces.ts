@@ -27,18 +27,20 @@ export const reorder = (names: string[], order: string[]) =>
   [...new Set(order.filter(n => names.includes(n))), ...names.filter(n => !order.includes(n))];
 
 export const BAR = 24; // frame title bar height, matches .frame .bar in renderer/index.html
-export type Frame = { frame: Rect; view: Rect; scale: number };
+export const ADDR = 32; // nstack's address row above each frame: 26px (.addr in renderer/index.html) + 6px gap
+const ADDR_H = 26;
+export type Frame = { frame: Rect; view: Rect; addr: Rect; scale: number };
 
-// scale each device to fit its cell (title bar included) keeping its true aspect ratio, never above 1:1, centred.
+// scale each device to fit its cell (address row and title bar included) keeping its true aspect ratio, never above 1:1, centred.
 // shared: every frame uses the smallest scale, so in the All grid relative sizes stay honest.
 export function fitFrames(cells: Rect[], sizes: { width: number; height: number }[], shared = false): Frame[] {
-  const fit = sizes.map((d, i) => Math.max(0.05, Math.min(cells[i].width / d.width, (cells[i].height - BAR) / d.height, 1)));
+  const fit = sizes.map((d, i) => Math.max(0.05, Math.min(cells[i].width / d.width, (cells[i].height - BAR - ADDR) / d.height, 1)));
   const min = Math.min(...fit);
   return sizes.map((d, i) => {
     const scale = shared ? min : fit[i], c = cells[i];
     const width = Math.round(d.width * scale), height = Math.round(d.height * scale);
-    const x = c.x + Math.floor((c.width - width) / 2), y = c.y + Math.floor((c.height - height - BAR) / 2);
-    return { scale, frame: { x, y, width, height: height + BAR }, view: { x, y: y + BAR, width, height } };
+    const x = c.x + Math.floor((c.width - width) / 2), y = c.y + ADDR + Math.floor((c.height - height - BAR - ADDR) / 2);
+    return { scale, frame: { x, y, width, height: height + BAR }, view: { x, y: y + BAR, width, height }, addr: { x, y: y - ADDR, width, height: ADDR_H } };
   });
 }
 
@@ -48,12 +50,12 @@ export const inset = (r: Rect, p: number): Rect => ({ x: r.x + p, y: r.y + p, wi
 // ponytail: no sideways scroll (native views sit above the shell page, so it can't scroll them); add when rows get long
 export function rowFrames(stage: Rect, sizes: { width: number; height: number }[], gap = 8): Frame[] {
   const aspect = sizes.reduce((n, d) => n + d.width / d.height, 0);
-  const h = Math.max(20, Math.floor(Math.min(stage.height - 2 * gap - BAR, (stage.width - gap * (sizes.length + 1)) / aspect, ...sizes.map(d => d.height))));
+  const h = Math.max(20, Math.floor(Math.min(stage.height - 2 * gap - BAR - ADDR, (stage.width - gap * (sizes.length + 1)) / aspect, ...sizes.map(d => d.height))));
   const widths = sizes.map(d => Math.round(d.width * h / d.height));
   let x = stage.x + Math.max(gap, Math.floor((stage.width - widths.reduce((a, b) => a + b, 0) - gap * (sizes.length - 1)) / 2));
-  const y = stage.y + Math.floor((stage.height - h - BAR) / 2);
+  const y = stage.y + ADDR + Math.floor((stage.height - h - BAR - ADDR) / 2);
   return sizes.map((d, i) => {
-    const f = { scale: h / d.height, frame: { x, y, width: widths[i], height: h + BAR }, view: { x, y: y + BAR, width: widths[i], height: h } };
+    const f = { scale: h / d.height, frame: { x, y, width: widths[i], height: h + BAR }, view: { x, y: y + BAR, width: widths[i], height: h }, addr: { x, y: y - ADDR, width: widths[i], height: ADDR_H } };
     x += widths[i] + gap;
     return f;
   });

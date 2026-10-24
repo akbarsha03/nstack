@@ -58,8 +58,12 @@ main{flex:1}
 .frame .bar b{color:var(--text);font-weight:600}
 .frame .bar .label{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .frame .bar .lights{flex:none}
-.frame .bar .url{flex:1 1 60px;min-width:60px;height:18px;font:11px var(--mono);color:var(--text);background:var(--bg);border:1px solid transparent;border-radius:4px;padding:0 6px;outline:0}
-.frame .bar .url:focus{border-color:var(--acc)}
+/* nstack's address row above each frame (shell chrome, not part of the device window) */
+.addr{position:fixed;height:26px;display:flex;gap:4px}
+.addr .url{flex:1;min-width:0;font:12px var(--mono);color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 8px;outline:0}
+.addr .url:focus{border-color:var(--acc)}
+.addr button{flex:none;font:12px var(--mono);padding:0 10px;border-radius:4px;background:var(--panel2)}
+.addr button:hover{border-color:var(--acc);color:var(--acc)}
 @container (max-width: 260px){.frame .bar .meta{display:none}}
 .lights{display:flex;gap:5px}
 .lights i{width:9px;height:9px;border-radius:50%;background:#ff5f57}
