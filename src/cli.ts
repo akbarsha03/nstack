@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { Command } from 'commander';
 import { loadConfig, addPersona, removePersona, renamePersona, ConfigError, literalPasswords, type Config } from './config.js';
 import { send } from './ipc.js';
-import { addAlias, readAliases, resolveAlias } from './aliases.js';
+import { addAlias, partitionDir } from './aliases.js';
 import { serveMock } from './mock.js';
 import { init } from './init.js';
 
@@ -185,8 +185,6 @@ program.command('mock', { isDefault: true }).description('serve and open the cli
 // for commands that never send secrets: an unset $ENV reads as empty instead of failing
 const anyEnv = new Proxy(process.env, { get: (env, k: string) => env[k] ?? '' });
 
-// where Electron keeps a persona's `persist:` partition (renamed ones keep their old one) under the userData main.ts / login.ts set
-const partitionDir = (dir: string, name: string) => path.join(dir, '.nstack', 'electron', 'Partitions', resolveAlias(readAliases(dir), name));
 
 const sandboxPath = (electron: string) => path.join(path.dirname(electron), 'chrome-sandbox');
 

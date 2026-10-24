@@ -11,7 +11,7 @@ const Persona = z.strictObject({
   login: z.strictObject({ fill: z.record(z.string(), z.string()), submit: z.string() }).optional(),
 });
 
-const NAME = /^[a-z][a-z0-9-]{0,15}$/;
+export const NAME = /^[a-z][a-z0-9-]{0,15}$/;
 
 const Schema = z.strictObject({
   baseUrl: z.url({ protocol: /^https?$/, error: 'must be an http(s) URL' }),
