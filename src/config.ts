@@ -109,3 +109,31 @@ export function addPersona(text: string, name: string, p: NewPersona, file = 'ns
   if (JSON.stringify(after) !== JSON.stringify({ ...before, [name]: entry })) throw new ConfigError(`could not add ${name} to ${file} safely; add it by hand`);
   return { text: out, persona: res.data };
 }
+
+// `nstack remove`: the file text without personas.<name>. Cuts that entry's lines out of the text so every other byte
+// (comments, alignment, quoting) stays as written; only a flow-style `personas: {…}` gets re-printed by the yaml lib.
+export function removePersona(text: string, name: string, file = 'nstack.yml'): string {
+  const doc = YAML.parseDocument(text);
+  if (doc.errors.length) throw new ConfigError(`${file}: not valid YAML\n  ${doc.errors[0].message.split('\n')[0]}`);
+  const before = doc.toJS()?.personas ?? {};
+  if (!Object.hasOwn(before, name)) throw new ConfigError(`${name} is not in ${file}`);
+  if (Object.keys(before).length === 1) throw new ConfigError(`${name} is the last persona in ${file}; nstack needs at least one`);
+
+  let out: string;
+  const map = doc.get('personas', true);
+  const pair = YAML.isMap(map) && !map.flow ? map.items.find(p => (p.key as YAML.Scalar)?.value === name) : undefined;
+  if (pair) {
+    const key = pair.key as YAML.Node, node = (pair.value as YAML.Node | null) ?? key;
+    const from = text.lastIndexOf('\n', key.range![0] - 1) + 1;
+    const nl = text.indexOf('\n', node.range![1] - 1), to = nl < 0 ? text.length : nl + 1;
+    out = text.slice(0, from) + text.slice(to);
+  } else {
+    doc.deleteIn(['personas', name]);
+    out = doc.toString();
+  }
+  // never write a file that lost another persona
+  const after = YAML.parse(out)?.personas ?? {}, want = { ...before };
+  delete want[name];
+  if (JSON.stringify(after) !== JSON.stringify(want)) throw new ConfigError(`could not remove ${name} from ${file} safely; remove it by hand`);
+  return out;
+}

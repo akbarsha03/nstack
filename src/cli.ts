@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { Command } from 'commander';
-import { loadConfig, addPersona, ConfigError, literalPasswords, type Config } from './config.js';
+import { loadConfig, addPersona, removePersona, ConfigError, literalPasswords, type Config } from './config.js';
 import { send } from './ipc.js';
 import { serveMock } from './mock.js';
 import { init } from './init.js';
@@ -117,6 +117,26 @@ program.command('add')
     console.log(`added personas.${name} to ${path.basename(file)} · no shell running here, opening one`);
     const { config, all } = load(opts.config, []);
     launch('main.js', { config, names: all, dir, file, space: name });
+  });
+
+program.command('remove')
+  .description('remove personas from nstack.yml (and their spaces from the running shell); saved sessions are kept')
+  .argument('<personas...>', 'persona names from nstack.yml')
+  .option('-c, --config <file>', 'config file', 'nstack.yml')
+  .action(async (names: string[], opts: { config: string }) => {
+    const { file, dir } = load(opts.config, names, anyEnv);
+    try {
+      fs.writeFileSync(file, names.reduce((text, n) => removePersona(text, n, path.basename(file)), fs.readFileSync(file, 'utf8')));
+    } catch (e) {
+      if (!(e instanceof ConfigError)) throw e;
+      console.error(e.message);
+      process.exit(1);
+    }
+    for (const name of names) {
+      const reply = await send(dir, { remove: name }).catch((e: Error) => ({ error: e.message }));
+      if (reply?.lines) reply.lines.forEach((l: string) => console.log(l));
+      else console.log(`removed personas.${name} from ${path.basename(file)} · session kept in .nstack/` + (reply?.error ? ` (running shell: ${reply.error})` : ''));
+    }
   });
 
 program.command('shot')

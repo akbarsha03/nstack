@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseConfig, ConfigError, literalPasswords } from '../src/config.js';
+import { parseConfig, ConfigError, literalPasswords, removePersona } from '../src/config.js';
 
 const OK = `
 baseUrl: http://localhost:3000
@@ -64,4 +64,17 @@ test('flags literal passwords but not $ENV ones', () => {
   assert.deepEqual(literalPasswords(OK), []);
   const lit = OK.replace('"$CUSTOMER_PASSWORD"', 'hunter2');
   assert.deepEqual(literalPasswords(lit), ['personas.customer.login.fill["input[name=password]"]']);
+});
+
+test('removePersona cuts one entry and keeps comments and the other personas', () => {
+  const yml = 'baseUrl: http://x\npersonas:\n  # the boss\n  admin:\n    device: desktop # big\n    start: /d\n  storage: {device: pixel-8} # floor\ntile: row # end\n';
+  assert.equal(removePersona(yml, 'admin'), 'baseUrl: http://x\npersonas:\n  # the boss\n  storage: {device: pixel-8} # floor\ntile: row # end\n');
+  assert.equal(removePersona(yml, 'storage'), 'baseUrl: http://x\npersonas:\n  # the boss\n  admin:\n    device: desktop # big\n    start: /d\ntile: row # end\n');
+  assert.deepEqual(Object.keys(parseConfig(removePersona('baseUrl: http://x\npersonas: {a: {}, b: {}}\n', 'a')).personas), ['b']);
+});
+
+test('removePersona refuses a missing name and the last persona', () => {
+  const no = (yml: string, name: string, re: RegExp) => assert.throws(() => removePersona(yml, name), (e: Error) => e instanceof ConfigError && re.test(e.message));
+  no('baseUrl: http://x\npersonas: {a: {}, b: {}}', 'c', /c is not in nstack\.yml/);
+  no('baseUrl: http://x\npersonas:\n  a: {}\n', 'a', /last persona.*at least one/);
 });

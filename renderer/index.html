@@ -37,6 +37,10 @@ button.on{border-color:var(--acc);color:var(--acc)}
 .spaces{display:flex;gap:6px;padding:8px 14px;background:#0f1318;border-bottom:1px solid var(--line);overflow-x:auto;flex:none;align-items:flex-end}
 .sp{display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 8px;border-radius:8px;background:none;border:1px solid transparent;flex:none}
 .sp:hover{background:var(--panel)}
+.sp{position:relative}
+.sp-x{position:absolute;top:2px;right:2px;width:16px;height:16px;line-height:14px;text-align:center;border-radius:50%;font-size:13px;color:var(--dim);background:var(--panel2);border:1px solid var(--line);display:none;z-index:1}
+.sp:hover .sp-x,.sp.cur .sp-x{display:block}
+.sp-x:hover{color:var(--bad);border-color:var(--bad)}
 .sp.cur{border-color:var(--acc);background:var(--panel2)}
 .mini{height:62px;min-width:62px;overflow:hidden;border-radius:4px;background:#fff;box-shadow:0 0 0 1px var(--line);display:block}
 .sp.drop-before{box-shadow:-3px 0 0 var(--acc)}
@@ -177,6 +181,17 @@ main{flex:1}
     <div class="actions">
       <button type="button" data-close>Cancel</button>
       <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</div>
+
+<div class="scrim" id="rmsp" role="dialog" aria-modal="true" aria-labelledby="rm-h">
+  <form class="modal" id="rm-form">
+    <h2 id="rm-h">Remove space <span class="rm-name"></span>?</h2>
+    <p>This deletes <code>personas.<span class="rm-name"></span></code> from <code class="yml-name">nstack.yml</code>. The saved login in <code>.nstack/</code> is kept until you run <code>nstack reset <span class="rm-name"></span></code>.</p>
+    <div class="actions">
+      <button type="button" data-close>Cancel</button>
+      <button type="submit" class="primary">Remove</button>
     </div>
   </form>
 </div>

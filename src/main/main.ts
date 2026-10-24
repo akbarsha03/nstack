@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { app, BrowserWindow, WebContentsView, dialog, ipcMain, nativeImage, type Rectangle } from 'electron';
-import { addPersona, parseConfig, ConfigError, type Config } from '../config.js';
+import { addPersona, removePersona, parseConfig, ConfigError, type Config } from '../config.js';
 import { parseDevice, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
 import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, inset, reorder } from './spaces.js';
@@ -205,6 +205,22 @@ function added(name: string, p: Persona): Line[] {
   return lines;
 }
 
+// a persona already cut from nstack.yml (by the CLI or the strip's ×) loses its space; its session stays on disk
+function removed(name: string): Line[] {
+  const v = views.get(name);
+  if (!v && !names.includes(name)) throw new ConfigError(`${name} is not open here`);
+  if (v) { win.contentView.removeChildView(v); v.webContents.close(); }
+  views.delete(name); devices.delete(name); out.delete(name); delete config.personas[name];
+  if (names.includes(name)) names.splice(names.indexOf(name), 1);
+  const { [name]: _, ...follow } = sync.prefs.follow;
+  sync.setPrefs({ follow });
+  const lines: Line[] = [['dim', `removed personas.${name} from ${path.basename(file)} · session kept in .nstack/`]];
+  log(`nstack remove ${name}`, lines);
+  if (space === name) goTo(names.length === 1 ? names[0] : 'all');
+  else { layout(); sendState(); saveState(); }
+  return lines;
+}
+
 const busy = new Set<string>();
 async function logIn(name: string) {
   if (busy.has(name)) return;
@@ -302,6 +318,14 @@ app.whenReady().then(() => {
     }
   });
   // Screenshot button: ask for a folder first (native views would paint over the dialog, so hide them meanwhile)
+  ipcMain.on('nstack:remove', (_e, name: string) => {
+    try {
+      fs.writeFileSync(file, removePersona(fs.readFileSync(file, 'utf8'), name, path.basename(file)));
+      removed(name);
+    } catch (e) {
+      log(`nstack remove ${name}`, [['bad', (e as Error).message]]);
+    }
+  });
   ipcMain.on('nstack:shot', async () => {
     cover(true);
     const pick = await dialog.showOpenDialog(win, {
@@ -314,9 +338,10 @@ app.whenReady().then(() => {
       ...s, src: s.png && nativeImage.createFromPath(s.png).resize({ height: Math.min(340, s.height!) }).toDataURL(),
     }))), e => { log('nstack shot', [['bad', (e as Error).message]]); win.webContents.send('nstack:shots', null); });
   });
-  // `nstack add` / `nstack shot` from a terminal in this folder
+  // `nstack add` / `nstack remove` / `nstack shot` from a terminal in this folder
   serve(dir, async msg => {
     if (msg && 'shot' in msg) return { shots: (await shot(msg.shot ?? undefined)).map(({ name, status, line }) => ({ name, status, line })) };
+    if (typeof msg?.remove === 'string') return { lines: removed(msg.remove).map(l => l[1]) };
     // the CLI already wrote nstack.yml; read the persona from there rather than trusting the socket
     const p = typeof msg?.add === 'string' && parseConfig(fs.readFileSync(file, 'utf8'), process.env, path.basename(file)).personas[msg.add];
     if (!p) throw new Error(`${msg?.add} is not in ${path.basename(file)}`);

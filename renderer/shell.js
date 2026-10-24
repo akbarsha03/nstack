@@ -17,7 +17,7 @@ function strip() {
     `<button class="sp" data-space="all" title="All windows (0 or a)"><span class="mini allmini">${personas.map(p =>
       `<i style="width:${Math.round(p.width * k)}px;height:${Math.round(p.height * k)}px"></i>`).join('')}</span><span class="sp-l">All</span></button>` +
     personas.map((p, i) => `<button class="sp ${p.out ? 'out' : ''}" data-space="${esc(p.name)}" draggable="true" title="${esc(p.name)} · ${esc(p.device)} ${p.width}×${p.height} (${i + 1})">
-      <img class="mini" alt="" draggable="false" ${thumbs[p.name] ? `src="${thumbs[p.name]}"` : ''}><span class="sp-l"><span class="dot"></span>${esc(p.name)} <small>${esc(p.device)}</small></span></button>`).join('') +
+      <span class="sp-x" role="button" data-remove="${esc(p.name)}" title="Remove ${esc(p.name)}">×</span><img class="mini" alt="" draggable="false" ${thumbs[p.name] ? `src="${thumbs[p.name]}"` : ''}><span class="sp-l"><span class="dot"></span>${esc(p.name)} <small>${esc(p.device)}</small></span></button>`).join('') +
     `<button class="sp add" id="b-add" title="Add space"><span class="mini">+</span><span class="sp-l"><small>Add space</small></span></button>
      <span class="keys">← → · 1–9 · 0 = All</span>`;
   document.querySelectorAll('.sp[data-space]').forEach(b => b.classList.toggle('cur', b.dataset.space === space));
@@ -155,7 +155,21 @@ $('#chips').addEventListener('click', e => {
   const c = e.target.closest('[data-chip]');
   if (c) nstack.send('chip', c.dataset.chip);
 });
+let removing = null;
+function openRemove(name) {
+  removing = name;
+  document.querySelectorAll('.rm-name').forEach(el => { el.textContent = name; });
+  show('#rmsp');
+  setTimeout(() => $('#rm-form [data-close]').focus(), 30);
+}
+$('#rm-form').addEventListener('submit', e => {
+  e.preventDefault();
+  closeAll();
+  nstack.send('remove', removing);
+});
 $('#spaces').addEventListener('click', e => {
+  const x = e.target.closest('[data-remove]');
+  if (x) return openRemove(x.dataset.remove);
   if (e.target.closest('#b-add')) return openAdd();
   const b = e.target.closest('[data-space]');
   if (b) nstack.send('go', b.dataset.space);
