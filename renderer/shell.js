@@ -4,6 +4,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
 let personas = [], space = 'all';
 const thumbs = {}; // last live preview per persona, kept across strip re-renders
+const urls = {}; // each persona's current path, for its frame's address bar
 
 function chips() {
   $('#chips').innerHTML = personas.map(p => `<button class="chip ${p.out ? 'out' : ''}" data-chip="${esc(p.name)}"
@@ -107,13 +108,28 @@ nstack.on('shots', shots => {
   setTimeout(() => $('#shots [data-close]').focus(), 30);
 });
 
-// the frame (title bar = persona · device · real size) around each visible persona; logged-out ones get the placeholder
+// the frame (title bar = persona · device · real size · address bar) around each visible persona; logged-out ones get the placeholder
 nstack.on('frames', frames => {
+  for (const f of frames) urls[f.name] = f.url;
   $('#frames').innerHTML = frames.filter(f => f.shown).map(f => `<div class="frame" style="left:${f.rect.x}px;top:${f.rect.y}px;width:${f.rect.width}px;height:${f.rect.height}px">
-    <div class="bar" title="${esc(f.name)} · ${esc(f.device)} · ${esc(f.size)}"><span class="lights"><i></i><i></i><i></i></span><span><b>${esc(f.name)}</b> · ${esc(f.device)} · ${esc(f.size)}</span></div>
+    <div class="bar" title="${esc(f.name)} · ${esc(f.device)} · ${esc(f.size)}"><span class="lights"><i></i><i></i><i></i></span><span><b>${esc(f.name)}</b> · ${esc(f.device)} · ${esc(f.size)}</span>
+      <input class="url" data-url="${esc(f.name)}" value="${esc(f.url)}" spellcheck="false" autocomplete="off" aria-label="${esc(f.name)} address"></div>
     ${f.out ? `<div class="lo"><b>⊘</b>Logged out<div>run <code>nstack login ${esc(f.name)}</code></div><button class="lb" data-login="${esc(f.name)}">Log in now</button></div>` : ''}</div>`).join('');
 });
 
+// a persona navigated; leave the address bar alone while it is being edited
+nstack.on('url', ({ name, path }) => {
+  urls[name] = path;
+  const i = document.querySelector(`input[data-url="${CSS.escape(name)}"]`);
+  if (i && i !== document.activeElement) i.value = path;
+});
+$('#frames').addEventListener('keydown', e => {
+  const i = e.target.closest('input[data-url]');
+  if (!i || (e.key !== 'Enter' && e.key !== 'Escape')) return;
+  if (e.key === 'Enter') nstack.send('goto', { name: i.dataset.url, path: i.value });
+  else i.value = urls[i.dataset.url] ?? '';
+  i.blur();
+});
 $('#frames').addEventListener('click', e => {
   const l = e.target.closest('[data-login]');
   if (l) nstack.send('login', l.dataset.login);

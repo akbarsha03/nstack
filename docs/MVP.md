@@ -60,7 +60,7 @@ Nothing open source does both as a product. That is the gap.
 ### Out (v2 candidates, not MVP)
 
 - Hot-reload sync, scroll sync, click mirroring.
-- Dragging/resizing windows inside the shell, typing into the fake address bar (navigate inside the app or via the terminal).
+- Dragging/resizing windows inside the shell. (Typing a path into a frame's address bar is in: Enter loads it in that persona, and Sync replays it.)
 - Visual diffing, CI mode, cloud.
 - Browser other than Chromium (the shell embeds Chromium; Firefox/WebKit would need a different shell).
 - Network throttling, geolocation, timezone per persona (easy later, cut for now).

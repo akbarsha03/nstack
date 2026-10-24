@@ -54,6 +54,8 @@ main{flex:1}
 .frame{position:fixed;container-type:inline-size;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:0 10px 30px #0009;display:flex;flex-direction:column}
 .frame .bar{height:24px;flex:none;display:flex;align-items:center;gap:8px;padding:0 8px;font:11px var(--mono);color:var(--dim);white-space:nowrap;overflow:hidden}
 .frame .bar b{color:var(--text);font-weight:600}
+.frame .bar .url{flex:1;min-width:0;height:18px;font:11px var(--mono);color:var(--text);background:var(--bg);border:1px solid transparent;border-radius:4px;padding:0 6px;outline:0}
+.frame .bar .url:focus{border-color:var(--acc)}
 .lights{display:flex;gap:5px}
 .lights i{width:9px;height:9px;border-radius:50%;background:#ff5f57}
 .lights i:nth-child(2){background:#febc2e}

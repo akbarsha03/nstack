@@ -9,7 +9,7 @@ import { tileGrid, nextSpace, spaceForKey, fitFrames, rowFrames, inset } from '.
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
 import { shoot } from './shot.js';
-import { createSync } from './sync.js';
+import { createSync, relPath } from './sync.js';
 
 type Persona = Config['personas'][string];
 const up = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string; file: string; space?: string; sync?: boolean };
@@ -40,6 +40,7 @@ const base = config.baseUrl.replace(/\/$/, '');
 const startUrl = (name: string) => base + config.personas[name].start;
 const size = (name: string) => `${devices.get(name)!.width}×${devices.get(name)!.height}`;
 const pad = (s: string, n = 10) => s.padEnd(n);
+const rel = (url: string) => relPath(url, config.baseUrl) ?? url; // what a frame's address bar shows
 
 const sync = createSync({
   baseUrl: config.baseUrl,
@@ -79,7 +80,7 @@ function layout() {
     emulate(v.webContents, devices.get(name)!, f.scale);
   });
   win.webContents.send('nstack:frames', names.map((name, i) => ({
-    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, shown: all || name === space, out: out.has(name),
+    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, shown: all || name === space, out: out.has(name), url: rel(views.get(name)!.webContents.getURL()),
   })));
 }
 
@@ -138,6 +139,7 @@ function watchLogin(name: string, v: WebContentsView) {
       sendState();
     }
     at = to;
+    if (ready) win.webContents.send('nstack:url', { name, path: rel(to) });
     if (!out.has(name)) sync.navigated(name, to);
   };
   v.webContents.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) from = d.url; });
@@ -245,6 +247,14 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:key', (_e, key: string) => onKey(key));
   ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));
   ipcMain.on('nstack:sync', () => setSync(!sync.on));
+  // a frame's address bar: not driven, so with Sync on the other spaces follow like any navigation of yours
+  ipcMain.on('nstack:goto', (_e, a: { name: string; path: string }) => {
+    const v = views.get(a.name), p = String(a.path ?? '').trim();
+    if (!v || !p) return;
+    const url = /^https?:\/\//i.test(p) ? p : base + (p.startsWith('/') ? p : '/' + p);
+    log(`# ${a.name} → ${rel(url)}`);
+    v.webContents.loadURL(url).catch(() => {});
+  });
   ipcMain.on('nstack:covered', (_e, on: boolean) => { covered = on; layout(); });
   ipcMain.on('nstack:yml', () => win.webContents.send('nstack:yml', fs.readFileSync(file, 'utf8')));
   ipcMain.on('nstack:chip', (_e, name: string) => { if (views.has(name)) out.has(name) ? logIn(name) : reset(name); });
