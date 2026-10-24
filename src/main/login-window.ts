@@ -25,10 +25,11 @@ const fillScript = (login: NonNullable<Config['personas'][string]['login']>) => 
 export type Say = (cls: 'ok' | 'bad' | 'dim', text: string) => void;
 const toConsole: Say = (cls, text) => (cls === 'bad' ? console.error : console.log)(text);
 
-export function login(config: Config, name: string, say: Say = toConsole): Promise<boolean> {
+// part: the persona's partition (aliases.ts), e.g. persist:<name>
+export function login(config: Config, name: string, part: string, say: Say = toConsole): Promise<boolean> {
   const loginUrl = config.baseUrl.replace(/\/$/, '') + config.loginPath;
   const p = config.personas[name], d = parseDevice(p.device)!;
-  const win = new BrowserWindow({ width: d.width, height: d.height, title: `nstack login · ${name}`, webPreferences: { partition: `persist:${name}` } });
+  const win = new BrowserWindow({ width: d.width, height: d.height, title: `nstack login · ${name}`, webPreferences: { partition: part } });
   const wc = win.webContents;
   if (d.userAgent) wc.setUserAgent(d.userAgent);
   const flush = keepSessionCookies(wc);

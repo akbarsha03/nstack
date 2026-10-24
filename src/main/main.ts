@@ -2,9 +2,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { app, BrowserWindow, WebContentsView, dialog, ipcMain, nativeImage, type Rectangle } from 'electron';
-import { addPersona, removePersona, parseConfig, ConfigError, type Config } from '../config.js';
+import { addPersona, removePersona, renamePersona, parseConfig, ConfigError, type Config } from '../config.js';
 import { parseDevice, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
+import { addAlias, partition } from '../aliases.js';
 import { nextSpace, spaceForKey, fitFrames, rowFrames, packFrames, inset, reorder } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
@@ -15,7 +16,7 @@ type Persona = Config['personas'][string];
 const up = JSON.parse(process.env.NSTACK_UP!) as { config: Config; names: string[]; dir: string; file: string; space?: string; sync?: boolean };
 const { config, dir, file } = up;
 const nstackDir = path.join(dir, '.nstack');
-// per-project profile: each persona's `persist:<name>` partition (cookies, storage) lives under here
+// per-project profile: each persona's `persist:` partition (aliases.ts keeps a renamed one's) (cookies, storage) lives under here
 app.setPath('userData', path.join(nstackDir, 'electron'));
 
 // last space, tile mode, Sync and its prefs, and the strip order survive restarts
@@ -36,6 +37,7 @@ let ready = false;
 let stage: Rectangle = { x: 0, y: 0, width: 0, height: 0 };
 let covered = false; // a dialog or the yml drawer is open; native views paint above the shell page, so hide them
 const views = new Map<string, WebContentsView>();
+const nameOf = new Map<WebContentsView, string>(); // a view's current persona name; a rename changes it under live listeners
 const devices = new Map<string, Device>();
 const out = new Set<string>(); // personas the app bounced to loginPath
 const base = config.baseUrl.replace(/\/$/, '');
@@ -151,9 +153,11 @@ async function thumbs() {
   }
 }
 
-function watchLogin(name: string, v: WebContentsView) {
+function watchLogin(v: WebContentsView) {
   let from = home, at = from;
   const check = (to: string) => {
+    const name = nameOf.get(v);
+    if (!name) return; // removed
     if (!out.has(name) && loggedOut(from, to, config.baseUrl, config.loginPath)) {
       out.add(name);
       log(null, [['bad', `${pad(name)} logged out — run nstack login ${name}`]]);
@@ -167,7 +171,7 @@ function watchLogin(name: string, v: WebContentsView) {
   v.webContents.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) from = d.url; });
   v.webContents.on('did-navigate', (_e, url) => check(url));
   v.webContents.on('did-navigate-in-page', (_e, url, isMain) => { if (isMain) { from = at; check(url); } });
-  v.webContents.on('did-stop-loading', () => sync.stopped(name));
+  v.webContents.on('did-stop-loading', () => sync.stopped(nameOf.get(v)!));
 }
 
 // one isolated view per persona; returns its line for the terminal
@@ -175,19 +179,20 @@ function open(name: string): Line {
   const d = parseDevice(config.personas[name].device)!;
   devices.set(name, d);
   const v = new WebContentsView({
-    webPreferences: { partition: `persist:${name}`, preload: path.join(__dirname, 'persona-preload.js'), backgroundThrottling: false },
+    webPreferences: { partition: partition(dir, name), preload: path.join(__dirname, 'persona-preload.js'), backgroundThrottling: false },
   });
   v.setVisible(false);
   if (d.userAgent) v.webContents.setUserAgent(d.userAgent);
   keepSessionCookies(v.webContents);
-  watchLogin(name, v);
+  nameOf.set(v, name);
+  watchLogin(v);
   win.contentView.addChildView(v);
   v.webContents.on('did-fail-load', (_e, code, desc, url, isMain) => {
-    if (isMain && code !== -3) log(null, [['bad', `${pad(name)} could not load ${url}: ${desc}`]]);
+    if (isMain && code !== -3) log(null, [['bad', `${pad(nameOf.get(v)!)} could not load ${url}: ${desc}`]]);
   });
   views.set(name, v);
   // the DevTools protocol needs a live page to answer, so emulate on a blank one, then go
-  load(name, 'about:blank').then(() => emulate(v.webContents, d, 1)).then(() => load(name, home))
+  load(name, 'about:blank').then(() => emulate(v.webContents, d, 1)).then(() => load(nameOf.get(v)!, home))
     .then(() => v.webContents.navigationHistory.clear()); // no Back to the blank page
   return ['', `${pad(name)} ${pad(config.personas[name].device, 9)} ${pad(size(name), 9)} → ${home}`];
 }
@@ -211,7 +216,7 @@ function added(name: string, p: Persona): Line[] {
 function removed(name: string): Line[] {
   const v = views.get(name);
   if (!v && !names.includes(name)) throw new ConfigError(`${name} is not open here`);
-  if (v) { win.contentView.removeChildView(v); v.webContents.close(); }
+  if (v) { win.contentView.removeChildView(v); v.webContents.close(); nameOf.delete(v); }
   views.delete(name); devices.delete(name); out.delete(name); delete config.personas[name];
   if (names.includes(name)) names.splice(names.indexOf(name), 1);
   const { [name]: _, ...follow } = sync.prefs.follow;
@@ -223,12 +228,35 @@ function removed(name: string): Line[] {
   return lines;
 }
 
+// a persona already renamed in nstack.yml (by the CLI or the tile menu): same view, same login, new name everywhere
+function renamed(from: string, to: string): Line[] {
+  if (!names.includes(from)) throw new ConfigError(`${from} is not open here`);
+  const move = <V>(m: Map<string, V>) => { if (m.has(from)) { m.set(to, m.get(from)!); m.delete(from); } };
+  move(views); move(devices);
+  nameOf.set(views.get(to)!, to);
+  if (out.delete(from)) out.add(to);
+  config.personas[to] = config.personas[from];
+  delete config.personas[from];
+  names[names.indexOf(from)] = to;
+  const { [from]: f, ...follow } = sync.prefs.follow;
+  sync.setPrefs({ follow: f === undefined ? follow : { ...follow, [to]: f } });
+  if (space === from) space = to;
+  addAlias(dir, from, to);
+  const lines: Line[] = [['dim', `renamed personas.${from} → ${to} in ${path.basename(file)} · login kept`]];
+  log(`nstack rename ${from} ${to}`, lines);
+  layout();
+  sendState();
+  saveState();
+  if (space === to) win.setTitle(`nstack · ${to}`);
+  return lines;
+}
+
 const busy = new Set<string>();
 async function logIn(name: string) {
   if (busy.has(name)) return;
   busy.add(name);
   log(`nstack login ${name}`);
-  const ok = await login(config, name, (c, t) => log(null, [[c, t]]));
+  const ok = await login(config, name, partition(dir, name), (c, t) => log(null, [[c, t]]));
   busy.delete(name);
   if (!ok) return;
   out.delete(name);
@@ -323,6 +351,14 @@ app.whenReady().then(() => {
       log(`nstack remove ${name}`, [['bad', (e as Error).message]]);
     }
   });
+  ipcMain.on('nstack:rename', (_e, a: { from: string; to: string }) => {
+    try {
+      fs.writeFileSync(file, renamePersona(fs.readFileSync(file, 'utf8'), a.from, a.to, path.basename(file)));
+      renamed(a.from, a.to);
+    } catch (e) {
+      log(`nstack rename ${a.from} ${a.to}`, [['bad', (e as Error).message]]);
+    }
+  });
   ipcMain.on('nstack:shot', async () => {
     cover(true);
     const pick = await dialog.showOpenDialog(win, {
@@ -335,9 +371,10 @@ app.whenReady().then(() => {
       ...s, src: s.png && nativeImage.createFromPath(s.png).resize({ height: Math.min(340, s.height!) }).toDataURL(),
     }))), e => { log('nstack shot', [['bad', (e as Error).message]]); win.webContents.send('nstack:shots', null); });
   });
-  // `nstack add` / `nstack remove` / `nstack shot` from a terminal in this folder
+  // `nstack add` / `nstack remove` / `nstack rename` / `nstack shot` from a terminal in this folder
   serve(dir, async msg => {
     if (msg && 'shot' in msg) return { shots: (await shot(msg.shot ?? undefined)).map(({ name, status, line }) => ({ name, status, line })) };
+    if (typeof msg?.rename?.from === 'string' && typeof msg.rename.to === 'string') return { lines: renamed(msg.rename.from, msg.rename.to).map(l => l[1]) };
     if (typeof msg?.remove === 'string') return { lines: removed(msg.remove).map(l => l[1]) };
     // the CLI already wrote nstack.yml; read the persona from there rather than trusting the socket
     const p = typeof msg?.add === 'string' && parseConfig(fs.readFileSync(file, 'utf8'), process.env, path.basename(file)).personas[msg.add];

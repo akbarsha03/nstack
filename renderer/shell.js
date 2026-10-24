@@ -177,6 +177,44 @@ $('#rm-form').addEventListener('submit', e => {
   closeAll();
   nstack.send('remove', removing);
 });
+// right-click a persona tile: Rename… / Remove…
+let renaming = null;
+function openRename(name) {
+  renaming = name;
+  $('#rn-h').textContent = `Rename space ${name}`;
+  $('#rn-name').value = name;
+  $('#rn-name').setCustomValidity('');
+  show('#rnsp');
+  setTimeout(() => $('#rn-name').select(), 30);
+}
+const closeMenu = () => { $('#tilemenu').hidden = true; };
+$('#spaces').addEventListener('contextmenu', e => {
+  const b = e.target.closest('.sp[draggable="true"]');
+  if (!b) return;
+  e.preventDefault();
+  const m = $('#tilemenu');
+  m.dataset.name = b.dataset.space;
+  m.hidden = false;
+  // native views paint over DOM, so keep the menu inside the strip
+  const r = $('#spaces').getBoundingClientRect();
+  m.style.left = `${Math.min(e.clientX, innerWidth - m.offsetWidth - 4)}px`;
+  m.style.top = `${Math.max(0, Math.min(e.clientY, r.bottom - m.offsetHeight))}px`;
+  m.querySelector('button').focus();
+});
+$('#tilemenu').addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'), name = $('#tilemenu').dataset.name;
+  closeMenu();
+  if (a?.dataset.act === 'rename') openRename(name);
+  if (a?.dataset.act === 'remove') openRemove(name);
+});
+document.addEventListener('mousedown', e => { if (!e.target.closest('#tilemenu')) closeMenu(); });
+$('#rn-name').addEventListener('input', e => e.target.setCustomValidity(['all', ...personas.map(p => p.name)].filter(n => n !== renaming).includes(e.target.value.trim()) ? 'that space already exists' : ''));
+$('#rn-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const to = $('#rn-name').value.trim();
+  closeAll();
+  if (to !== renaming) nstack.send('rename', { from: renaming, to });
+});
 $('#spaces').addEventListener('click', e => {
   const x = e.target.closest('[data-remove]');
   if (x) return openRemove(x.dataset.remove);
@@ -235,7 +273,7 @@ document.querySelectorAll('[data-tile]').forEach(b => b.onclick = () => nstack.s
 $('#b-term').onclick = () => $('#term').classList.toggle('closed'); // #stage shrinks or grows, the observer below re-lays out
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') return closeAll();
+  if (e.key === 'Escape') return closeMenu(), closeAll();
   if (isOpen() || e.target.closest?.('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey || !/^(ArrowLeft|ArrowRight|[0-9]|a)$/.test(e.key)) return;
   e.preventDefault();
   nstack.send('key', e.key);

@@ -5,6 +5,7 @@ import { BrowserWindow } from 'electron';
 import type { Config } from '../config.js';
 import { parseDevice, PRESETS, type Device } from '../devices.js';
 import { emulate, loggedOut } from './persona.js';
+import { partition } from '../aliases.js';
 
 // png: absolute path; file: the same as shown to people (relative to the project when inside it, else ~); dir: the run folder, shown the same way
 export type Shot = { name: string; status: 'ok' | 'out' | 'fail'; line: string; dir: string; png?: string; file?: string; width?: number; height?: number };
@@ -56,7 +57,7 @@ export function manifest(o: { time: Date; baseUrl: string; at?: string; rows: Ro
 }
 
 // `nstack shot`: each persona in its own hidden offscreen window at its real viewport size, so the open spaces are
-// left where they are. Same `persist:<name>` partition = same login. Each run gets its own folder under `shots`
+// left where they are. Same partition (aliases.ts) = same login. Each run gets its own folder under `shots`
 // (default .nstack/shots): one PNG per persona plus a README.md describing them.
 export async function shoot(config: Config, names: string[], dir: string, at?: string, skip = new Set<string>(), shots = path.join(dir, '.nstack', 'shots')): Promise<Shot[]> {
   const time = new Date(), show = (p: string) => path.relative(dir, p).startsWith('..') ? p.replace(os.homedir(), '~') : path.relative(dir, p);
@@ -78,7 +79,7 @@ export async function shoot(config: Config, names: string[], dir: string, at?: s
     if (skip.has(name)) { out.push(gone()); continue; }
     const win = new BrowserWindow({
       show: false, width: d.width, height: d.height, useContentSize: true,
-      webPreferences: { partition: `persist:${name}`, offscreen: true, backgroundThrottling: false },
+      webPreferences: { partition: partition(dir, name), offscreen: true, backgroundThrottling: false },
     });
     const wc = win.webContents;
     let painted = false;

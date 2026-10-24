@@ -138,3 +138,22 @@ export function removePersona(text: string, name: string, file = 'nstack.yml'): 
   if (JSON.stringify(after) !== JSON.stringify(want)) throw new ConfigError(`could not remove ${name} from ${file} safely; remove it by hand`);
   return out;
 }
+
+// `nstack rename`: the file text with personas.<from> keyed <to>. Rewrites only the key's own characters, so every
+// other byte (comments, alignment, the persona's place in the list) stays as written.
+export function renamePersona(text: string, from: string, to: string, file = 'nstack.yml'): string {
+  if (!NAME.test(to)) throw new ConfigError('persona names are lowercase letters, digits and dashes, max 16');
+  const doc = YAML.parseDocument(text);
+  if (doc.errors.length) throw new ConfigError(`${file}: not valid YAML\n  ${doc.errors[0].message.split('\n')[0]}`);
+  const before = doc.toJS()?.personas ?? {};
+  if (!Object.hasOwn(before, from)) throw new ConfigError(`${from} is not in ${file}`);
+  if (Object.hasOwn(before, to)) throw new ConfigError(`${to} is already in ${file}`);
+  const map = doc.get('personas', true);
+  const key = YAML.isMap(map) ? map.items.find(p => (p.key as YAML.Scalar)?.value === from)?.key as YAML.Node | undefined : undefined;
+  if (!key?.range) throw new ConfigError(`could not rename ${from} in ${file} safely; rename it by hand`);
+  const out = text.slice(0, key.range[0]) + to + text.slice(key.range[1]);
+  // never write a file that lost or reordered a persona
+  const want = Object.fromEntries(Object.entries(before).map(([k, v]) => [k === from ? to : k, v]));
+  if (JSON.stringify(YAML.parse(out)?.personas ?? {}) !== JSON.stringify(want)) throw new ConfigError(`could not rename ${from} in ${file} safely; rename it by hand`);
+  return out;
+}

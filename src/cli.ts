@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { Command } from 'commander';
-import { loadConfig, addPersona, removePersona, ConfigError, literalPasswords, type Config } from './config.js';
+import { loadConfig, addPersona, removePersona, renamePersona, ConfigError, literalPasswords, type Config } from './config.js';
 import { send } from './ipc.js';
+import { addAlias, readAliases, resolveAlias } from './aliases.js';
 import { serveMock } from './mock.js';
 import { init } from './init.js';
 
@@ -138,6 +139,27 @@ program.command('remove')
     }
   });
 
+program.command('rename')
+  .description('rename a persona in nstack.yml (and its space in the running shell); the saved login is kept')
+  .argument('<from>', 'persona name in nstack.yml')
+  .argument('<to>', 'new name: lowercase letters, digits, dashes')
+  .option('-c, --config <file>', 'config file', 'nstack.yml')
+  .action(async (from: string, to: string, opts: { config: string }) => {
+    const { file, dir } = load(opts.config, [from], anyEnv);
+    try {
+      fs.writeFileSync(file, renamePersona(fs.readFileSync(file, 'utf8'), from, to, path.basename(file)));
+    } catch (e) {
+      if (!(e instanceof ConfigError)) throw e;
+      console.error(e.message);
+      process.exit(1);
+    }
+    // a running shell with that space moves it and records the alias; otherwise record it here
+    const reply = await send(dir, { rename: { from, to } }).catch((e: Error) => ({ error: e.message }));
+    if (reply?.lines) return reply.lines.forEach((l: string) => console.log(l));
+    addAlias(dir, from, to);
+    console.log(`renamed personas.${from} → ${to} in ${path.basename(file)} · login kept` + (reply?.error ? ` (running shell: ${reply.error})` : ''));
+  });
+
 program.command('shot')
   .description('screenshot every persona at path (default: /) into a new run folder under .nstack/shots')
   .argument('[path]', 'app path, e.g. /invoices')
@@ -163,8 +185,8 @@ program.command('mock', { isDefault: true }).description('serve and open the cli
 // for commands that never send secrets: an unset $ENV reads as empty instead of failing
 const anyEnv = new Proxy(process.env, { get: (env, k: string) => env[k] ?? '' });
 
-// where Electron keeps `persist:<name>` under the userData that main.ts / login.ts set
-const partitionDir = (dir: string, name: string) => path.join(dir, '.nstack', 'electron', 'Partitions', name);
+// where Electron keeps a persona's `persist:` partition (renamed ones keep their old one) under the userData main.ts / login.ts set
+const partitionDir = (dir: string, name: string) => path.join(dir, '.nstack', 'electron', 'Partitions', resolveAlias(readAliases(dir), name));
 
 const sandboxPath = (electron: string) => path.join(path.dirname(electron), 'chrome-sandbox');
 

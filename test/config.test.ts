@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseConfig, ConfigError, literalPasswords, removePersona } from '../src/config.js';
+import { parseConfig, ConfigError, literalPasswords, removePersona, renamePersona } from '../src/config.js';
 
 const OK = `
 baseUrl: http://localhost:3000
@@ -75,4 +75,19 @@ test('removePersona refuses a missing name and the last persona', () => {
   const no = (yml: string, name: string, re: RegExp) => assert.throws(() => removePersona(yml, name), (e: Error) => e instanceof ConfigError && re.test(e.message));
   no('baseUrl: http://x\npersonas: {a: {}, b: {}}', 'c', /c is not in nstack\.yml/);
   no('baseUrl: http://x\npersonas:\n  a: {}\n', 'a', /last persona.*at least one/);
+});
+
+test('renamePersona changes only the key, comments and order kept', () => {
+  const yml = 'baseUrl: http://x\npersonas:\n  # the boss\n  admin:  # top\n    device: desktop\n  storage: {device: pixel-8} # floor\n';
+  assert.equal(renamePersona(yml, 'admin', 'chief'), yml.replace('  admin:', '  chief:'));
+  assert.deepEqual(Object.keys(parseConfig(renamePersona(yml, 'storage', 'floor')).personas), ['admin', 'floor']);
+  assert.match(renamePersona('baseUrl: http://x\npersonas: {a: {}, b: {}}\n', 'a', 'c'), /\{c: \{\}, b: \{\}\}/);
+});
+
+test('renamePersona refuses a missing name, a taken name and a bad name', () => {
+  const yml = 'baseUrl: http://x\npersonas: {a: {}, b: {}}';
+  const no = (from: string, to: string, re: RegExp) => assert.throws(() => renamePersona(yml, from, to), (e: Error) => e instanceof ConfigError && re.test(e.message));
+  no('c', 'd', /c is not in nstack\.yml/);
+  no('a', 'b', /b is already in nstack\.yml/);
+  no('a', 'Big', /lowercase/);
 });
