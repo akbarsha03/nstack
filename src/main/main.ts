@@ -134,6 +134,21 @@ function setOrder(order: string[]) {
   sendState();
 }
 
+// a frame's reload button, ⌘/Ctrl+R: driven, so Sync does not replay a path every space already shows
+function reload(who: string[]) {
+  who = who.filter(n => views.has(n) && !out.has(n));
+  if (!who.length) return;
+  for (const n of who) { sync.drive(n); views.get(n)!.webContents.reload(); }
+  log(`# reload ${who.join(', ')}`);
+}
+// ⌘/Ctrl+R anywhere in the window (shell page or a persona's page) reloads the current space, or every one in All,
+// never the shell page itself
+const reloadKey = (e: Electron.Event, i: Electron.Input) => {
+  if (i.type !== 'keyDown' || !(i.meta || i.control) || i.alt || i.key.toLowerCase() !== 'r') return;
+  e.preventDefault();
+  reload(space === 'all' ? names : [space]);
+};
+
 // ⟳ in a phone's or tablet's frame: portrait ↔ landscape (re-emulated by layout())
 function rotate(name: string) {
   if (!views.has(name) || !devices.get(name)!.touch) return;
@@ -199,6 +214,7 @@ function open(name: string): Line {
   keepSessionCookies(v.webContents);
   nameOf.set(v, name);
   watchLogin(v);
+  v.webContents.on('before-input-event', reloadKey);
   win.contentView.addChildView(v);
   v.webContents.on('did-fail-load', (_e, code, desc, url, isMain) => {
     if (isMain && code !== -3) log(null, [['bad', `${pad(nameOf.get(v)!)} could not load ${url}: ${desc}`]]);
@@ -308,6 +324,7 @@ app.whenReady().then(() => {
     webPreferences: { preload: path.join(__dirname, 'shell-preload.js') },
   });
   win.loadFile(path.join(__dirname, '..', '..', '..', 'renderer', 'index.html'));
+  win.webContents.on('before-input-event', reloadKey);
 
   log('nstack up' + (sync.on ? ' --sync' : ''), [['dim', `config ${path.basename(file)} · baseUrl ${config.baseUrl}`], ...names.map(open)]);
   log(null, [['dim', `${names.length} spaces + All · showing ${space} · sync ${sync.on ? 'on' : 'off'} · close the window or Ctrl+C to quit`]]);
@@ -326,6 +343,7 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:go', (_e, id: string) => goTo(id));
   ipcMain.on('nstack:key', (_e, key: string) => onKey(key));
   ipcMain.on('nstack:reorder', (_e, order: string[]) => setOrder(order));
+  ipcMain.on('nstack:reload', (_e, name: string) => reload([name]));
   ipcMain.on('nstack:rotate', (_e, name: string) => rotate(name));
   ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));
   ipcMain.on('nstack:sync', () => setSync(!sync.on));
