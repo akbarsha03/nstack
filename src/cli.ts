@@ -120,7 +120,7 @@ program.command('add')
   });
 
 program.command('shot')
-  .description('screenshot every persona at path (default: each start) to .nstack/shots/<persona>.png')
+  .description('screenshot every persona at path (default: each start) into a new run folder under .nstack/shots')
   .argument('[path]', 'app path, e.g. /invoices')
   .option('-c, --config <file>', 'config file', 'nstack.yml')
   .action(async (at: string | undefined, opts: { config: string }) => {

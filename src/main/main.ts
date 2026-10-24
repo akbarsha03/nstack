@@ -311,7 +311,7 @@ app.whenReady().then(() => {
     shotDir = pick.filePaths[0];
     saveState();
     shot(undefined, shotDir).then(shots => win.webContents.send('nstack:shots', shots.map(s => ({
-      ...s, file: s.png?.replace(os.homedir(), '~'), src: s.png && nativeImage.createFromPath(s.png).resize({ height: Math.min(340, s.height!) }).toDataURL(),
+      ...s, src: s.png && nativeImage.createFromPath(s.png).resize({ height: Math.min(340, s.height!) }).toDataURL(),
     }))), e => { log('nstack shot', [['bad', (e as Error).message]]); win.webContents.send('nstack:shots', null); });
   });
   // `nstack add` / `nstack shot` from a terminal in this folder

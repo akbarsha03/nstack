@@ -41,13 +41,15 @@ personas:
     c.stderr.on('data', d => { out += d; });
     c.on('close', code => resolve({ code, out }));
   });
-  const shot = (n: string) => path.join(dir, '.nstack', 'shots', `${n}.png`);
+  // each run writes .nstack/shots/<stamp>-<path slug>[-n]/<persona>-<device>-<WxH>@<dpr>x.png plus a README.md
   const sizes = { phone: [393, 852], desk: [1440, 900], odd: [1000, 700] };
   const expectShots = (r: { code: number | null; out: string }) => {
     assert.equal(r.code, 0, r.out);
     for (const [n, wh] of Object.entries(sizes)) {
-      assert.deepEqual(png(shot(n)), wh, n);
-      assert.match(r.out, new RegExp(`${n} +→ \\.nstack/shots/${n}\\.png  ${wh[0]}×${wh[1]}  /x`));
+      const m = r.out.match(new RegExp(`${n} +→ (\\.nstack/shots/[0-9-]+-x(?:-\\d+)?/${n}-[a-z0-9-]+-${wh[0]}x${wh[1]}@[0-9.]+x\\.png)  ${wh[0]}×${wh[1]}  /x`));
+      assert.ok(m, r.out);
+      assert.deepEqual(png(path.join(dir, m[1])), wh, n);
+      assert.ok(fs.existsSync(path.join(dir, path.dirname(m[1]), 'README.md')));
     }
   };
   let up: ReturnType<typeof spawn> | undefined;
@@ -58,7 +60,6 @@ personas:
     assert.equal(r.code, 0, r.out);
     for (const n of Object.keys(sizes)) {
       assert.match(r.out, new RegExp(`${n} +logged out — run nstack login ${n}`));
-      assert.ok(!fs.existsSync(shot(n)), `stale ${n}.png removed`);
     }
 
     // with `nstack up` running in the folder, the shell takes the shot
