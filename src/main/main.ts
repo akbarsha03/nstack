@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { app, BrowserWindow, WebContentsView, ipcMain, nativeImage, type Rectangle } from 'electron';
+import { app, BrowserWindow, WebContentsView, dialog, ipcMain, nativeImage, type Rectangle } from 'electron';
 import { addPersona, parseConfig, ConfigError, type Config } from '../config.js';
 import { parseDevice, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
@@ -26,8 +26,9 @@ const names = reorder(up.names, Array.isArray(saved.order) ? saved.order : []);
 const spaces = () => ['all', ...names];
 let space: string = up.space ?? saved.space ?? names[0];
 if (!spaces().includes(space)) space = names[0];
+let shotDir: string | undefined = typeof saved.shotDir === 'string' ? saved.shotDir : undefined; // last folder the Screenshot button saved to
 let tile: 'grid' | 'row' = saved.tile === 'grid' || saved.tile === 'row' ? saved.tile : config.tile;
-const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs, order: names })); } catch {} };
+const saveState = () => { try { fs.writeFileSync(stateFile, JSON.stringify({ space, tile, sync: sync.on, syncPrefs: sync.prefs, order: names, shotDir })); } catch {} };
 
 const THUMB_MS = 1500;
 let win: BrowserWindow;
@@ -228,11 +229,11 @@ async function reset(name: string) {
 
 // Shot button and `nstack shot` from a terminal; personas already known to be logged out are skipped
 let shooting = false;
-async function shot(at?: string) {
+async function shot(at?: string, to?: string) {
   if (shooting) throw new Error('a shot is already running');
   shooting = true;
   try {
-    const shots = await shoot(config, names, dir, at, out);
+    const shots = await shoot(config, names, dir, at, out, to);
     log(`nstack shot${at ? ' ' + at : ''}`, shots.map(s => [s.status === 'ok' ? 'ok' : 'bad', s.line]));
     return shots;
   } finally {
@@ -276,7 +277,8 @@ app.whenReady().then(() => {
     log(`# ${a.name} → ${rel(url)}`);
     v.webContents.loadURL(url).catch(() => {});
   });
-  ipcMain.on('nstack:covered', (_e, on: boolean) => { covered = on; layout(); });
+  const cover = (on: boolean) => { covered = on; layout(); };
+  ipcMain.on('nstack:covered', (_e, on: boolean) => cover(on));
   ipcMain.on('nstack:yml', () => win.webContents.send('nstack:yml', fs.readFileSync(file, 'utf8')));
   ipcMain.on('nstack:chip', (_e, name: string) => { if (views.has(name)) out.has(name) ? logIn(name) : reset(name); });
   ipcMain.on('nstack:login', (_e, name?: string) => {
@@ -299,9 +301,19 @@ app.whenReady().then(() => {
       log(addCmd(a.name, { device: a.device, start: a.start }), [['bad', (e as Error).message]]);
     }
   });
-  ipcMain.on('nstack:shot', () => shot().then(shots => win.webContents.send('nstack:shots', shots.map(s => ({
-    ...s, src: s.png && nativeImage.createFromPath(s.png).resize({ height: Math.min(340, s.height!) }).toDataURL(),
-  }))), e => { log('nstack shot', [['bad', (e as Error).message]]); win.webContents.send('nstack:shots', null); }));
+  // Screenshot button: ask for a folder first (native views would paint over the dialog, so hide them meanwhile)
+  ipcMain.on('nstack:shot', async () => {
+    cover(true);
+    const pick = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory', 'createDirectory'], defaultPath: shotDir ?? path.join(nstackDir, 'shots'), buttonLabel: 'Save screenshots here',
+    }).finally(() => cover(false));
+    if (pick.canceled || !pick.filePaths[0]) return win.webContents.send('nstack:shots', null);
+    shotDir = pick.filePaths[0];
+    saveState();
+    shot(undefined, shotDir).then(shots => win.webContents.send('nstack:shots', shots.map(s => ({
+      ...s, file: s.png?.replace(os.homedir(), '~'), src: s.png && nativeImage.createFromPath(s.png).resize({ height: Math.min(340, s.height!) }).toDataURL(),
+    }))), e => { log('nstack shot', [['bad', (e as Error).message]]); win.webContents.send('nstack:shots', null); });
+  });
   // `nstack add` / `nstack shot` from a terminal in this folder
   serve(dir, async msg => {
     if (msg && 'shot' in msg) return { shots: (await shot(msg.shot ?? undefined)).map(({ name, status, line }) => ({ name, status, line })) };

@@ -111,7 +111,7 @@ nstack.on('shots', shots => {
   $('#b-shot').disabled = false;
   if (!shots) return;
   $('#shotgrid').innerHTML = shots.map(s => s.src
-    ? `<figure><img src="${s.src}" alt="${esc(s.name)} screenshot"><figcaption>.nstack/shots/${esc(s.name)}.png<span>${s.width}×${s.height}</span></figcaption></figure>`
+    ? `<figure><img src="${s.src}" alt="${esc(s.name)} screenshot"><figcaption>${esc(s.file)}<span>${s.width}×${s.height}</span></figcaption></figure>`
     : `<figure class="skip"><figcaption>${esc(s.line)}</figcaption></figure>`).join('');
   show('#shots');
   setTimeout(() => $('#shots [data-close]').focus(), 30);

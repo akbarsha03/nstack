@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { BrowserWindow } from 'electron';
 import type { Config } from '../config.js';
@@ -12,13 +13,14 @@ const pad = (s: string, n = 10) => s.padEnd(n);
 export const shotPath = (p: string | undefined, start: string) => !p ? start : p.startsWith('/') ? p : '/' + p;
 
 // `nstack shot`: each persona in its own hidden offscreen window at its real viewport size, so the open spaces are
-// left where they are. Same `persist:<name>` partition = same login. Writes .nstack/shots/<name>.png.
-export async function shoot(config: Config, names: string[], dir: string, at?: string, skip = new Set<string>()): Promise<Shot[]> {
-  const shots = path.join(dir, '.nstack', 'shots');
+// left where they are. Same `persist:<name>` partition = same login. Writes <shots>/<name>.png (default .nstack/shots).
+export async function shoot(config: Config, names: string[], dir: string, at?: string, skip = new Set<string>(), shots = path.join(dir, '.nstack', 'shots')): Promise<Shot[]> {
   fs.mkdirSync(shots, { recursive: true });
   const out: Shot[] = [];
   for (const name of names) {
-    const d = parseDevice(config.personas[name].device)!, rel = `.nstack/shots/${name}.png`, file = path.join(shots, `${name}.png`);
+    const d = parseDevice(config.personas[name].device)!, file = path.join(shots, `${name}.png`);
+    // relative to the project when inside it, else absolute with ~
+    const rel = path.relative(dir, file).startsWith('..') ? file.replace(os.homedir(), '~') : path.relative(dir, file);
     const url = config.baseUrl.replace(/\/$/, '') + shotPath(at, config.personas[name].start);
     const gone = (): Shot => {
       fs.rmSync(file, { force: true }); // a stale shot of this persona would pass for a fresh one
