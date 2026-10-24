@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextSpace, spaceForKey, fitFrames, rowFrames, packFrames, reorder, BAR, ADDR, type Frame } from '../src/main/spaces.js';
+import { nextSpace, spaceForKey, fitFrames, rowFrames, rowWidth, packFrames, reorder, BAR, ADDR, type Frame } from '../src/main/spaces.js';
 
 test('arrow keys walk the strip and wrap around at the ends', () => {
   const s = ['all', 'admin', 'storage', 'customer'];
@@ -90,19 +90,25 @@ test('All grid: a tiny stage still gives non-overlapping frames at the 0.05 floo
   assert.ok(apart(f));
 });
 
-test('All row: one row, equal heights, fits the stage width', () => {
-  const stage = { x: 0, y: 50, width: 1200, height: 800 };
-  const f = rowFrames(stage, [{ width: 1440, height: 900 }, { width: 412, height: 915 }, { width: 820, height: 1180 }]);
-  assert.equal(new Set(f.map(x => x.view.height)).size, 1);
-  assert.ok(f.every(x => x.frame.y === f[0].frame.y && x.view.y === x.frame.y + BAR && x.addr.y === x.frame.y - ADDR && x.addr.width === x.frame.width));
-  assert.ok(f[0].addr.y >= stage.y && f[0].frame.y + f[0].frame.height <= stage.y + stage.height);
-  for (let i = 1; i < f.length; i++) assert.ok(f[i].frame.x >= f[i - 1].frame.x + f[i - 1].frame.width);
-  const last = f[f.length - 1].frame;
-  assert.ok(f[0].frame.x >= 8 && last.x + last.width <= 1200 - 8);
-  assert.ok(Math.abs(f[1].view.width / f[1].view.height - 412 / 915) < 0.01);
-  // a short stage: height is the limit, never upscaled past the smallest device
-  const [one] = rowFrames({ x: 0, y: 0, width: 5000, height: 5000 }, [{ width: 393, height: 852 }]);
-  assert.equal(one.view.height, 852);
+test('All row: every space fills the stage height; a long row overflows to the right', () => {
+  const stage = { x: 0, y: 50, width: 1200, height: 800 }, avail = 800 - 32 - BAR - ADDR;
+  const f = rowFrames(stage, [DESK, PHONE, TAB], 16);
+  assert.ok(f.every(x => x.view.height === avail), 'all as tall as the stage allows');
+  assert.ok(f.every(x => x.addr.y === f[0].addr.y && x.view.y === x.frame.y + BAR && x.addr.y === x.frame.y - ADDR));
+  assert.ok(f[0].addr.y >= 50 + 16 && f[0].frame.y + f[0].frame.height <= 850 - 16);
+  assert.ok(Math.abs(f[1].view.width / f[1].view.height - 393 / 852) < 0.01);
+  for (let i = 1; i < f.length; i++) assert.equal(f[i].frame.x, f[i - 1].frame.x + f[i - 1].frame.width + 16);
+  assert.equal(f[0].frame.x, 16, 'starts at the left edge when it overflows');
+  assert.ok(rowWidth(stage, f, 16) > 1200);
+  assert.equal(rowWidth(stage, f, 16), f[2].frame.x + f[2].frame.width + 16);
+});
+
+test('All row: a short row is centred and never upscaled', () => {
+  const stage = { x: 0, y: 0, width: 5000, height: 5000 };
+  const f = rowFrames(stage, [PHONE, PHONE], 16);
+  assert.equal(f[0].view.height, 852);
+  assert.equal(f[0].frame.x - stage.x, stage.width - (f[1].frame.x + f[1].frame.width) - (stage.width - 2 * 393 - 16) % 2);
+  assert.ok(rowWidth(stage, f, 16) <= stage.width);
 });
 
 test('reorder follows the given order, drops unknowns, keeps the rest at the end', () => {

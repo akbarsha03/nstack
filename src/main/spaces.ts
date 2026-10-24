@@ -74,17 +74,18 @@ export function packFrames(stage: Rect, sizes: Size[], gap = 16): Frame[] {
 
 export const inset = (r: Rect, p: number): Rect => ({ x: r.x + p, y: r.y + p, width: Math.max(0, r.width - 2 * p), height: Math.max(0, r.height - 2 * p) });
 
-// All space, row mode: one row, every window the same height, shrunk until the row fits the stage width
-// ponytail: no sideways scroll (native views sit above the shell page, so it can't scroll them); add when rows get long
-export function rowFrames(stage: Rect, sizes: { width: number; height: number }[], gap = 8): Frame[] {
-  const aspect = sizes.reduce((n, d) => n + d.width / d.height, 0);
-  const h = Math.max(20, Math.floor(Math.min(stage.height - 2 * gap - BAR - ADDR, (stage.width - gap * (sizes.length + 1)) / aspect, ...sizes.map(d => d.height))));
-  const widths = sizes.map(d => Math.round(d.width * h / d.height));
-  let x = stage.x + Math.max(gap, Math.floor((stage.width - widths.reduce((a, b) => a + b, 0) - gap * (sizes.length - 1)) / 2));
-  const y = stage.y + ADDR + Math.floor((stage.height - h - BAR - ADDR) / 2);
-  return sizes.map((d, i) => {
-    const f = { scale: h / d.height, frame: { x, y, width: widths[i], height: h + BAR }, view: { x, y: y + BAR, width: widths[i], height: h }, addr: { x, y: y - ADDR, width: widths[i], height: ADDR_H } };
-    x += widths[i] + gap;
-    return f;
-  });
+// All space, row mode: one row, every window as tall as the stage allows (never above 1:1), left to right. A row wider
+// than the stage starts at the left edge and main scrolls it sideways; a narrower one is centred. Rows are top-aligned.
+export function rowFrames(stage: Rect, sizes: Size[], gap = 8): Frame[] {
+  const avail = Math.max(20, stage.height - 2 * gap - BAR - ADDR);
+  const scales = sizes.map(d => Math.min(1, avail / d.height));
+  const ws = sizes.map((d, i) => Math.round(d.width * scales[i])), hs = sizes.map((d, i) => Math.round(d.height * scales[i]));
+  const content = ws.reduce((a, b) => a + b, 0) + gap * (sizes.length - 1);
+  let x = stage.x + Math.max(gap, Math.floor((stage.width - content) / 2));
+  const y = stage.y + Math.floor((stage.height - Math.max(0, ...hs) - BAR - ADDR) / 2);
+  return sizes.map((_, i) => { const f = at(scales[i], x, y, ws[i], hs[i]); x += ws[i] + gap; return f; });
 }
+
+// the row's full width from the stage's left edge, its trailing gap included (> stage.width when it scrolls)
+export const rowWidth = (stage: Rect, frames: Frame[], gap = 8) =>
+  frames.length ? frames[frames.length - 1].frame.x + frames[frames.length - 1].frame.width + gap - stage.x : 0;

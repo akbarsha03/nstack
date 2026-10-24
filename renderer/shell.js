@@ -113,7 +113,7 @@ nstack.on('state', s => {
   syncPrefs = s.syncPrefs;
   chips();
   strip();
-  $('#b-prev').hidden = $('#b-next').hidden = !personas.length; // All + one persona is still two spaces
+  navs();
   document.querySelectorAll('[data-tile]').forEach(b => b.classList.toggle('on', b.dataset.tile === s.tile));
   $('.seg').classList.toggle('off', space !== 'all');
   $('#b-sync').classList.toggle('on', s.sync);
@@ -283,6 +283,31 @@ $('#spf-form').addEventListener('submit', e => {
 });
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeAll));
 document.querySelectorAll('.scrim').forEach(s => s.addEventListener('click', e => { if (e.target === s) closeAll(); }));
+// All row wider than the stage: a scrollbar under it, and no ‹ › (overflowing views would paint over them)
+let scroll = { x: 0, max: 0, stage: 1, total: 1 };
+function navs() { $('#b-prev').hidden = $('#b-next').hidden = !personas.length || scroll.max > 0; } // All + one persona is still two spaces
+nstack.on('scroll', s => {
+  scroll = s;
+  navs();
+  $('#hscroll').hidden = !s.max;
+  if (!s.max) return;
+  const w = $('#hscroll').clientWidth;
+  $('#hthumb').style.width = `${Math.max(24, w * s.stage / s.total)}px`;
+  $('#hthumb').style.left = `${(w - Math.max(24, w * s.stage / s.total)) * s.x / s.max}px`;
+});
+$('#hscroll').addEventListener('pointerdown', e => {
+  const track = $('#hscroll'), w = track.clientWidth, thumb = $('#hthumb').offsetWidth, per = scroll.max / Math.max(1, w - thumb);
+  if (e.target !== $('#hthumb')) nstack.send('scroll', (e.offsetX - thumb / 2) * per); // click the track: jump there
+  const x0 = e.clientX, s0 = e.target === $('#hthumb') ? scroll.x : (e.offsetX - thumb / 2) * per;
+  track.setPointerCapture(e.pointerId);
+  track.classList.add('drag');
+  const move = m => nstack.send('scroll', s0 + (m.clientX - x0) * per);
+  track.addEventListener('pointermove', move);
+  track.addEventListener('pointerup', () => { track.removeEventListener('pointermove', move); track.classList.remove('drag'); }, { once: true });
+});
+$('#stage').addEventListener('wheel', e => {
+  if (scroll.max && (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey)) nstack.send('wheel', { dx: e.deltaX, dy: e.deltaY, shift: e.shiftKey });
+}, { passive: true });
 $('#b-prev').onclick = () => nstack.send('key', 'ArrowLeft');
 $('#b-next').onclick = () => nstack.send('key', 'ArrowRight');
 $('#b-login').onclick = () => nstack.send('login');

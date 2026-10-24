@@ -63,6 +63,11 @@ main{flex:1;position:relative}
 .nav:hover{background:var(--panel);color:var(--text);border:0}
 #b-prev{left:2px}#b-next{right:2px}
 .covered .nav,.nav[hidden]{display:none}
+/* the All row's sideways scrollbar, in the 16px gap under the frames */
+.hscroll{position:absolute;left:48px;right:48px;bottom:4px;height:8px;border-radius:4px;background:var(--panel);z-index:5;cursor:pointer}
+.hscroll[hidden],.covered .hscroll{display:none}
+.hscroll i{position:absolute;top:0;bottom:0;border-radius:4px;background:var(--line)}
+.hscroll i:hover,.hscroll.drag i{background:#3b4756}
 .sp.out .dot{background:var(--bad);box-shadow:0 0 6px var(--bad)}
 .sp.out .mini{opacity:.35}
 /* persona frames; the page itself is a native view main.ts lays over the area under .bar */
@@ -165,7 +170,7 @@ main{flex:1;position:relative}
   <button class="ymlbtn" id="b-yml">nstack.yml</button>
 </div>
 <nav class="spaces" id="spaces" aria-label="Spaces"></nav>
-<main id="stage"><button class="nav" id="b-prev" title="Previous space (←)" aria-label="Previous space">‹</button><button class="nav" id="b-next" title="Next space (→)" aria-label="Next space">›</button></main>
+<main id="stage"><div class="hscroll" id="hscroll" hidden><i id="hthumb"></i></div><button class="nav" id="b-prev" title="Previous space (←)" aria-label="Previous space">‹</button><button class="nav" id="b-next" title="Next space (→)" aria-label="Next space">›</button></main>
 <div class="term closed" id="term">
   <button class="th" id="b-term"><span class="caret">&#9662;</span> terminal <span class="unread" id="unread" hidden></span><span class="grow"></span><span id="dir"></span></button>
   <div class="log" id="log" aria-live="polite"></div>

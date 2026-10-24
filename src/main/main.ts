@@ -6,7 +6,7 @@ import { addPersona, removePersona, renamePersona, quickName, parseConfig, Confi
 import { parseDevice, rotated, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
 import { addAlias, partition } from '../aliases.js';
-import { nextSpace, spaceForKey, fitFrames, rowFrames, packFrames, inset, reorder } from './spaces.js';
+import { nextSpace, spaceForKey, fitFrames, rowFrames, rowWidth, packFrames, inset, reorder, type Frame, type Rect } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
 import { shoot } from './shot.js';
@@ -77,27 +77,46 @@ const sendState = () => ready && win.webContents.send('nstack:state', {
   space, tile, sync: sync.on, syncPrefs: sync.prefs, personas: names.map(n => ({ name: n, device: config.personas[n].device, width: dims(n).width, height: dims(n).height, out: out.has(n) })),
 });
 
-function layout() {
+// All in row mode scrolls sideways when the row is wider than the stage (not persisted)
+let scrollX = 0, scrollMax = 0;
+const shift = (r: Rect): Rect => ({ ...r, x: r.x - scrollX });
+
+// scrolling only moves views; emulation (scale) is redone on a real re-layout only
+function layout(scrollOnly = false) {
   const all = space === 'all', sizes = names.map(dims);
   // native views paint above the page, so keep 48px clear at each side for the stage's ‹ › arrows (32 here + the 16 gap)
   const room = { ...stage, x: stage.x + 32, width: Math.max(0, stage.width - 64) };
   // hidden views keep their single-space size so their thumbnails render at a real size
-  const frames = !all ? sizes.map(d => fitFrames([inset(room, 16)], [d])[0])
+  let frames: Frame[] = !all ? sizes.map(d => fitFrames([inset(room, 16)], [d])[0])
     : tile === 'row' ? rowFrames(room, sizes, 16)
     : packFrames(room, sizes, 16);
+  const total = all && tile === 'row' ? rowWidth(room, frames, 16) : 0;
+  scrollMax = Math.max(0, total - room.width);
+  scrollX = Math.round(Math.max(0, Math.min(scrollX, scrollMax)));
+  if (scrollMax) frames = frames.map(f => ({ ...f, frame: shift(f.frame), view: shift(f.view), addr: shift(f.addr) }));
   names.forEach((name, i) => {
     const v = views.get(name)!, f = frames[i];
     v.setBounds(f.view);
     v.setVisible((all || name === space) && !out.has(name) && !covered);
-    emulate(v.webContents, dims(name), f.scale);
+    if (!scrollOnly) emulate(v.webContents, dims(name), f.scale);
   });
+  win.webContents.send('nstack:scroll', { x: scrollX, max: scrollMax, stage: room.width, total });
   win.webContents.send('nstack:frames', names.map((name, i) => ({
     name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, addr: frames[i].addr, shown: all || name === space, out: out.has(name), touch: devices.get(name)!.touch, landscape: landscape.has(name), url: rel(views.get(name)!.webContents.getURL()),
   })));
 }
 
+// one re-layout per frame however fast a swipe or a scrollbar drag sends positions
+let scrollTimer: ReturnType<typeof setTimeout> | undefined;
+function scrollTo(x: number) {
+  if (!scrollMax || !Number.isFinite(x)) return;
+  scrollX = x;
+  scrollTimer ??= setTimeout(() => { scrollTimer = undefined; layout(true); }, 16);
+}
+
 function goTo(id: string) {
   if (!spaces().includes(id)) return;
+  if (id !== space) scrollX = 0;
   if (id !== space) log(`# space → ${id === 'all' ? 'All' : `${id}  ${config.personas[id].device} ${size(id)}`}`);
   space = id;
   layout();
@@ -163,6 +182,7 @@ function rotate(name: string) {
 function setTile(m: string) {
   if (m !== 'grid' && m !== 'row') return;
   tile = m;
+  scrollX = 0;
   log(`# tile: ${m}`, [['dim', m === 'row' ? 'All space: one row, equal heights' : 'All space: grid, true relative sizes']]);
   saveState();
   if (space === 'all') { layout(); sendState(); } else goTo('all');
@@ -345,6 +365,11 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:key', (_e, key: string) => onKey(key));
   ipcMain.on('nstack:reorder', (_e, order: string[]) => setOrder(order));
   ipcMain.on('nstack:term', (_e, open: boolean) => { term = open === true; saveState(); });
+  // the stage's scrollbar (absolute x) and sideways swipes / Shift+wheel, from the shell page or inside a persona's page
+  ipcMain.on('nstack:scroll', (_e, x: number) => scrollTo(Number(x)));
+  ipcMain.on('nstack:wheel', (_e, w: { dx: number; dy: number; shift: boolean }) => {
+    if (space === 'all' && tile === 'row') scrollTo(scrollX + Number(w.shift && !w.dx ? w.dy : w.dx));
+  });
   ipcMain.on('nstack:reload', (_e, name: string) => reload([name]));
   ipcMain.on('nstack:rotate', (_e, name: string) => rotate(name));
   ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));
