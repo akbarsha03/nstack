@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextSpace, spaceForKey, fitFrames, rowFrames, rowWidth, packFrames, reorder, BAR, ADDR, type Frame } from '../src/main/spaces.js';
+import { nextSpace, spaceForKey, fitFrames, rowFrames, rowWidth, packFrames, reorder, reloadAll, BAR, ADDR, type Frame } from '../src/main/spaces.js';
 
 test('arrow keys walk the strip and wrap around at the ends', () => {
   const s = ['all', 'admin', 'storage', 'customer'];
@@ -115,4 +115,13 @@ test('reorder follows the given order, drops unknowns, keeps the rest at the end
   assert.deepEqual(reorder(['admin', 'storage', 'customer'], ['customer', 'admin']), ['customer', 'admin', 'storage']);
   assert.deepEqual(reorder(['admin', 'storage'], ['gone', 'storage', 'storage']), ['storage', 'admin']);
   assert.deepEqual(reorder(['admin', 'storage'], []), ['admin', 'storage']);
+});
+
+test('reloadAll reloads every space with a view, and does nothing with none', () => {
+  const calls: string[][] = [];
+  const views = new Map([['admin', 1], ['storage', 2], ['customer', 3]]);
+  reloadAll(views.keys(), who => calls.push(who));
+  assert.deepEqual(calls, [['admin', 'storage', 'customer']]);
+  reloadAll(new Map().keys(), who => calls.push(who));
+  assert.equal(calls.length, 1);
 });

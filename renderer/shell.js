@@ -322,6 +322,7 @@ $('#b-prev').onclick = () => nstack.send('key', 'ArrowLeft');
 $('#b-next').onclick = () => nstack.send('key', 'ArrowRight');
 $('#b-login').onclick = () => nstack.send('login');
 $('#b-shot').onclick = () => { $('#b-shot').disabled = true; nstack.send('shot'); };
+$('#b-reloadall').onclick = () => { const b = $('#b-reloadall'); b.disabled = true; nstack.send('reload-all'); setTimeout(() => b.disabled = false, 1000); };
 $('#b-sync').onclick = () => nstack.send('sync');
 $('#b-syncprefs').onclick = openPrefs;
 $('#b-yml').onclick = () => { nstack.send('yml'); show('#yml'); };

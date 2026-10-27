@@ -6,7 +6,7 @@ import { addPersona, removePersona, renamePersona, quickName, parseConfig, Confi
 import { parseDevice, rotated, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
 import { partition, newSession, renameSession, dropSession, sweepSessions } from '../sessions.js';
-import { nextSpace, spaceForKey, fitFrames, rowFrames, rowWidth, packFrames, inset, reorder, type Frame, type Rect } from './spaces.js';
+import { nextSpace, spaceForKey, fitFrames, rowFrames, rowWidth, packFrames, inset, reorder, reloadAll, type Frame, type Rect } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
 import { shoot } from './shot.js';
@@ -177,7 +177,7 @@ const canBack = (name: string) => views.get(name)!.webContents.navigationHistory
 const reloadKey = (e: Electron.Event, i: Electron.Input) => {
   if (i.type !== 'keyDown') return;
   const k = i.key.toLowerCase();
-  if ((i.meta || i.control) && !i.alt && k === 'r') { e.preventDefault(); return reload(space === 'all' ? names : [space]); }
+  if ((i.meta || i.control) && !i.alt && k === 'r') { e.preventDefault(); return i.shift ? reloadAll(views.keys(), reload) : reload(space === 'all' ? names : [space]); }
   // back: Alt+← (any platform) or ⌘[ (mac), only with one space showing
   if (space !== 'all' && ((i.alt && !i.meta && !i.control && i.key === 'ArrowLeft') || (process.platform === 'darwin' && i.meta && !i.alt && k === '['))) {
     e.preventDefault();
@@ -412,6 +412,7 @@ app.whenReady().then(() => {
   });
   ipcMain.on('nstack:back', (_e, name: string) => back(name));
   ipcMain.on('nstack:reload', (_e, name: string) => reload([name]));
+  ipcMain.on('nstack:reload-all', () => reloadAll(views.keys(), reload));
   ipcMain.on('nstack:rotate', (_e, name: string) => rotate(name));
   ipcMain.on('nstack:tile', (_e, m: string) => setTile(m));
   ipcMain.on('nstack:sync', () => setSync(!sync.on));
