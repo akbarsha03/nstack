@@ -19,11 +19,9 @@ const shape = (w, h, maxH = MINI_H, maxW = MINI_W) => {
 };
 
 function strip() {
-  // All: every bar at one scale (relative sizes stay honest), same ratio rule and caps, scaled to the 46px inner height
-  const k = Math.min(46 / Math.max(...personas.map(p => p.height)), 46 * MINI_W / MINI_H / Math.max(...personas.map(p => p.width)));
+  // All: a fixed small button, no preview — one bar per space made it wider with every space added
   $('#spaces').innerHTML =
-    `<button class="sp" data-space="all" title="All windows (0 or a)"><span class="mini allmini">${personas.map(p =>
-      `<i style="width:${Math.round(p.width * k)}px;height:${Math.round(p.height * k)}px"></i>`).join('')}</span><span class="sp-l">All</span></button>` +
+    `<button class="sp" data-space="all" title="All windows (0 or a)"><span class="mini allmini">&#9638;</span><span class="sp-l">All</span></button>` +
     personas.map((p, i) => `<button class="sp ${p.out ? 'out' : ''}" data-space="${esc(p.name)}" draggable="true" title="${esc(p.name)} · ${esc(p.device)} ${p.width}×${p.height} (${i + 1})">
       <span class="sp-x" role="button" data-remove="${esc(p.name)}" title="Remove ${esc(p.name)}">×</span><img class="mini dev ${p.width > p.height ? 'wide' : ''}" alt="" draggable="false" style="${(([w, h]) => `width:${w}px;height:${h}px;margin:${(MINI_H - h) / 2}px 0`)(shape(p.width, p.height))}" ${thumbs[p.name] ? `src="${thumbs[p.name]}"` : ''}><span class="sp-l"><span class="dot"></span>${esc(p.name)} <small>${esc(p.device)}</small></span></button>`).join('') +
     `<button class="sp add" id="b-add" title="Add space"><span class="mini">+</span><span class="sp-l"><small>Add space</small></span></button>
