@@ -7,7 +7,7 @@ const thumbs = {}; // last live preview per persona, kept across strip re-render
 const urls = {}; // each persona's current path, for its frame's address bar
 
 function chips() {
-  $('#chips').innerHTML = personas.map(p => `<button class="chip ${p.out ? 'out' : ''}" data-chip="${esc(p.name)}"
+  $('#chips').innerHTML = personas.map(p => `<button class="chip ${p.out ? 'out' : ''} ${p.name === space ? 'cur' : ''}" data-chip="${esc(p.name)}"
     title="${p.out ? 'logged out · right-click to log in' : 'logged in · right-click to log out'}"><span class="dot"></span>${esc(p.name)}</button>`).join('');
 }
 
