@@ -8,7 +8,7 @@ const urls = {}; // each persona's current path, for its frame's address bar
 
 function chips() {
   $('#chips').innerHTML = personas.map(p => `<button class="chip ${p.out ? 'out' : ''}" data-chip="${esc(p.name)}"
-    title="${p.out ? 'logged out · click to log in' : 'session saved · click to reset'}"><span class="dot"></span>${esc(p.name)}</button>`).join('');
+    title="${p.out ? 'logged out · right-click to log in' : 'logged in · right-click to log out'}"><span class="dot"></span>${esc(p.name)}</button>`).join('');
 }
 
 // a device's own shape inside a tile: as tall as maxH, narrowed to its ratio; a wide one capped at maxW (height follows)
@@ -184,9 +184,27 @@ $('#frames').addEventListener('click', e => {
   const l = e.target.closest('[data-login]');
   if (l) nstack.send('login', l.dataset.login);
 });
+// a chip's click only goes to that space; log in / log out live in its right-click menu (a stray click used to delete the session)
 $('#chips').addEventListener('click', e => {
   const c = e.target.closest('[data-chip]');
-  if (c) nstack.send('chip', c.dataset.chip);
+  if (c) nstack.send('go', c.dataset.chip);
+});
+$('#chips').addEventListener('contextmenu', e => {
+  const c = e.target.closest('[data-chip]');
+  if (!c) return;
+  e.preventDefault();
+  const m = $('#chipmenu'), p = personas.find(x => x.name === c.dataset.chip);
+  m.dataset.name = c.dataset.chip;
+  m.querySelector('[data-act="session"]').textContent = p?.out ? 'Log in…' : 'Log out (delete session)';
+  m.hidden = false;
+  m.style.left = `${Math.min(e.clientX, innerWidth - m.offsetWidth - 4)}px`;
+  m.style.top = `${e.clientY}px`;
+  m.querySelector('button').focus();
+});
+$('#chipmenu').addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'), name = $('#chipmenu').dataset.name;
+  $('#chipmenu').hidden = true;
+  if (a?.dataset.act === 'session') nstack.send('chip', name);
 });
 let removing = null;
 function openRemove(name) {
@@ -230,7 +248,7 @@ $('#tilemenu').addEventListener('click', e => {
   if (a?.dataset.act === 'rename') openRename(name);
   if (a?.dataset.act === 'remove') openRemove(name);
 });
-document.addEventListener('mousedown', e => { if (!e.target.closest('#tilemenu')) closeMenu(); });
+document.addEventListener('mousedown', e => { if (!e.target.closest('#tilemenu')) closeMenu(); if (!e.target.closest('#chipmenu')) $('#chipmenu').hidden = true; });
 $('#rn-name').addEventListener('input', e => e.target.setCustomValidity(['all', ...personas.map(p => p.name)].filter(n => n !== renaming).includes(e.target.value.trim()) ? 'that space already exists' : ''));
 $('#rn-form').addEventListener('submit', e => {
   e.preventDefault();
