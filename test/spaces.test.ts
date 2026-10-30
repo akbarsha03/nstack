@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextSpace, spaceForKey, fitFrames, rowFrames, rowWidth, packFrames, reorder, reloadAll, BAR, ADDR, type Frame } from '../src/main/spaces.js';
+import { nextSpace, spaceForKey, focusTarget, fitFrames, rowFrames, rowWidth, packFrames, reorder, reloadAll, BAR, ADDR, type Frame } from '../src/main/spaces.js';
 
 test('arrow keys walk the strip and wrap around at the ends', () => {
   const s = ['all', 'admin', 'storage', 'customer'];
@@ -8,6 +8,13 @@ test('arrow keys walk the strip and wrap around at the ends', () => {
   assert.equal(nextSpace(s, 'admin', -1), 'all');
   assert.equal(nextSpace(s, 'all', -1), 'customer');
   assert.equal(nextSpace(s, 'customer', 1), 'all');
+});
+
+test('a logged-out space hands keyboard focus to the shell, so arrows keep cycling past it', () => {
+  const out = new Set(['storage']);
+  assert.equal(focusTarget('storage', out), 'shell');
+  assert.equal(focusTarget('admin', out), 'admin');
+  assert.equal(focusTarget('all', out), 'shell');
 });
 
 test('digit keys pick a persona, 0 and a pick All', () => {

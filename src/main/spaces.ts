@@ -4,6 +4,10 @@ export type Rect = { x: number; y: number; width: number; height: number };
 export const nextSpace = (spaces: string[], cur: string, d: number) =>
   spaces[(((spaces.indexOf(cur) + d) % spaces.length) + spaces.length) % spaces.length];
 
+// who gets keyboard focus for a space: its page, or the shell page for All and for a logged-out space, whose view is
+// hidden behind the placeholder (its sign-in page's focused field would swallow every arrow key after it)
+export const focusTarget = (space: string, out: Set<string>) => (space === 'all' || out.has(space) ? 'shell' : space);
+
 // 0 or a = All, 1–9 = nth persona
 export function spaceForKey(names: string[], key: string): string | undefined {
   if (key === '0' || key === 'a') return 'all';

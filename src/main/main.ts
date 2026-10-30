@@ -6,7 +6,7 @@ import { addPersona, removePersona, renamePersona, quickName, parseConfig, Confi
 import { parseDevice, rotated, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
 import { partition, newSession, renameSession, dropSession, sweepSessions } from '../sessions.js';
-import { nextSpace, spaceForKey, fitFrames, rowFrames, rowWidth, packFrames, inset, reorder, reloadAll, type Frame, type Rect } from './spaces.js';
+import { nextSpace, spaceForKey, focusTarget, fitFrames, rowFrames, rowWidth, packFrames, inset, reorder, reloadAll, type Frame, type Rect } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
 import { shoot } from './shot.js';
@@ -123,8 +123,13 @@ function goTo(id: string) {
   layout();
   sendState();
   win.setTitle(`nstack · ${id === 'all' ? 'All' : id}`);
-  if (!covered) (id === 'all' ? win.webContents : views.get(id)!.webContents).focus();
+  focusSpace();
   saveState();
+}
+
+function focusSpace() {
+  const t = focusTarget(space, out);
+  if (!covered) (t === 'shell' ? win.webContents : views.get(t)!.webContents).focus();
 }
 
 const onKey = (key: string) => {
@@ -228,6 +233,7 @@ function watchLogin(v: WebContentsView) {
       log(null, [['bad', `${pad(name)} logged out — run nstack login ${name}`]]);
       layout();
       sendState();
+      if (name === space) focusSpace();
     }
     at = to;
     if (ready) win.webContents.send('nstack:url', { name, path: rel(to), canBack: canBack(name) });
@@ -351,6 +357,7 @@ async function logIn(name: string) {
   load(name, home);
   layout();
   sendState();
+  if (name === space) focusSpace();
 }
 
 async function reset(name: string) {
@@ -359,6 +366,7 @@ async function reset(name: string) {
   log(`nstack reset ${name}`, [['dim', `${pad(name)} session deleted → run nstack login ${name}`]]);
   layout();
   sendState();
+  if (name === space) focusSpace();
 }
 
 // Shot button and `nstack shot` from a terminal; personas already known to be logged out are skipped
