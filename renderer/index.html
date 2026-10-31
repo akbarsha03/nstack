@@ -62,10 +62,11 @@ button.on{border-color:var(--acc);color:var(--acc)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);flex:none}
 .keys{margin-left:auto;align-self:center;font:11px var(--mono);color:var(--dim);white-space:nowrap;padding-left:12px}
 main{flex:1;position:relative}
-/* ‹ › on the stage edges: step through spaces (main keeps 48px clear of native views on each side) */
+/* ‹ › on the stage edges: back / forward in the current space (main keeps 48px clear of native views on each side) */
 .nav{position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:44px;height:120px;padding:0;border:0;border-radius:22px;background:none;
   color:var(--dim);font:300 54px/1 var(--sans)}
 .nav:hover{background:var(--panel);color:var(--text);border:0}
+.nav:disabled{opacity:.25;background:none;color:var(--dim)}
 #b-prev{left:2px}#b-next{right:2px}
 .covered .nav,.nav[hidden]{display:none}
 /* the All row's sideways scrollbar, in the 16px gap under the frames */
@@ -180,7 +181,7 @@ main{flex:1;position:relative}
   <button class="th" id="b-strip" aria-controls="spaces" aria-expanded="true"><span class="caret">&#9662;</span> spaces <small id="spsum"></small></button>
   <nav class="spaces" id="spaces" aria-label="Spaces"></nav>
 </div>
-<main id="stage"><div class="hscroll" id="hscroll" hidden><i id="hthumb"></i></div><button class="nav" id="b-prev" title="Previous space (←)" aria-label="Previous space">‹</button><button class="nav" id="b-next" title="Next space (→)" aria-label="Next space">›</button></main>
+<main id="stage"><div class="hscroll" id="hscroll" hidden><i id="hthumb"></i></div><button class="nav" id="b-prev" title="Back (←, Alt+←, ⌘[)" aria-label="Back">‹</button><button class="nav" id="b-next" title="Forward (→, Alt+→, ⌘])" aria-label="Forward">›</button></main>
 <div class="term closed" id="term">
   <button class="th" id="b-term"><span class="caret">&#9662;</span> terminal <span class="unread" id="unread" hidden></span><span class="grow"></span><span id="dir"></span></button>
   <div class="log" id="log" aria-live="polite"></div>

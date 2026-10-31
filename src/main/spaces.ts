@@ -1,12 +1,21 @@
 export type Rect = { x: number; y: number; width: number; height: number };
 
-// ← / → and the stage's ‹ › walk the strip order (All first), wrapping around at both ends
+// Shift+Tab / Ctrl+Shift+Tab walk the strip order (All first), wrapping around at both ends
 export const nextSpace = (spaces: string[], cur: string, d: number) =>
   spaces[(((spaces.indexOf(cur) + d) % spaces.length) + spaces.length) % spaces.length];
 
 // who gets keyboard focus for a space: its page, or the shell page for All and for a logged-out space, whose view is
-// hidden behind the placeholder (its sign-in page's focused field would swallow every arrow key after it)
+// hidden behind the placeholder (its sign-in page's focused field would swallow every space-pick key after it)
 export const focusTarget = (space: string, out: Set<string>) => (space === 'all' || out.has(space) ? 'shell' : space);
+
+// keys caught before any page sees them (shell or persona): browser-style tab and history shortcuts.
+// Shift+Tab and Ctrl+Tab = next space, Ctrl+Shift+Tab = previous; Alt+← / Alt+→ (⌘[ / ⌘] on macOS) = back / forward
+export type KeyInput = { key: string; shift: boolean; control: boolean; meta: boolean; alt: boolean };
+export function keyAction(i: KeyInput, mac: boolean): 'next' | 'prev' | 'back' | 'forward' | undefined {
+  if (i.key === 'Tab' && !i.alt && !i.meta) return i.control && i.shift ? 'prev' : i.control || i.shift ? 'next' : undefined;
+  if (i.alt && !i.meta && !i.control && !i.shift) return i.key === 'ArrowLeft' ? 'back' : i.key === 'ArrowRight' ? 'forward' : undefined;
+  if (mac && i.meta && !i.alt && !i.control && !i.shift) return i.key === '[' ? 'back' : i.key === ']' ? 'forward' : undefined;
+}
 
 // 0 or a = All, 1–9 = nth persona
 export function spaceForKey(names: string[], key: string): string | undefined {

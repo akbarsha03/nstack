@@ -1,13 +1,30 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextSpace, spaceForKey, focusTarget, fitFrames, rowFrames, rowWidth, packFrames, reorder, reloadAll, BAR, ADDR, type Frame } from '../src/main/spaces.js';
+import { nextSpace, keyAction, spaceForKey, focusTarget, fitFrames, rowFrames, rowWidth, packFrames, reorder, reloadAll, BAR, ADDR, type Frame } from '../src/main/spaces.js';
 
-test('arrow keys walk the strip and wrap around at the ends', () => {
+test('Shift+Tab walks the strip and wrap around at the ends', () => {
   const s = ['all', 'admin', 'storage', 'customer'];
   assert.equal(nextSpace(s, 'admin', 1), 'storage');
   assert.equal(nextSpace(s, 'admin', -1), 'all');
   assert.equal(nextSpace(s, 'all', -1), 'customer');
   assert.equal(nextSpace(s, 'customer', 1), 'all');
+});
+
+test('browser keys: Shift+Tab cycles spaces, Alt+arrows and ⌘[ ] go back and forward', () => {
+  const k = (key: string, m: Partial<{ shift: boolean; control: boolean; meta: boolean; alt: boolean }> = {}, mac = true) =>
+    keyAction({ key, shift: false, control: false, meta: false, alt: false, ...m }, mac);
+  assert.equal(k('Tab'), undefined);
+  assert.equal(k('Tab', { shift: true }), 'next');
+  assert.equal(k('Tab', { control: true }), 'next');
+  assert.equal(k('Tab', { control: true, shift: true }), 'prev');
+  assert.equal(k('Tab', { meta: true, shift: true }), undefined);
+  assert.equal(k('ArrowLeft'), undefined);
+  assert.equal(k('ArrowRight'), undefined);
+  assert.equal(k('ArrowLeft', { alt: true }), 'back');
+  assert.equal(k('ArrowRight', { alt: true }), 'forward');
+  assert.equal(k('[', { meta: true }), 'back');
+  assert.equal(k(']', { meta: true }), 'forward');
+  assert.equal(k('[', { meta: true }, false), undefined);
 });
 
 test('a logged-out space hands keyboard focus to the shell, so arrows keep cycling past it', () => {

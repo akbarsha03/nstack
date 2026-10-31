@@ -5,6 +5,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
 let personas = [], space = 'all', syncPrefs = { query: true, leaderOnlyCurrent: false, follow: {} };
 const thumbs = {}; // last live preview per persona, kept across strip re-renders
 const urls = {}; // each persona's current path, for its frame's address bar
+const hist = {}; // each persona's { canBack, canFwd }, for its Back button and the stage's ‹ ›
 
 function chips() {
   $('#chips').innerHTML = personas.map(p => `<button class="chip ${p.out ? 'out' : ''} ${p.name === space ? 'cur' : ''}" data-chip="${esc(p.name)}"
@@ -25,7 +26,7 @@ function strip() {
     personas.map((p, i) => `<button class="sp ${p.out ? 'out' : ''}" data-space="${esc(p.name)}" draggable="true" title="${esc(p.name)} · ${esc(p.device)} ${p.width}×${p.height} (${i + 1})">
       <span class="sp-x" role="button" data-remove="${esc(p.name)}" title="Remove ${esc(p.name)}">×</span><img class="mini dev ${p.width > p.height ? 'wide' : ''}" alt="" draggable="false" style="${(([w, h]) => `width:${w}px;height:${h}px;margin:${(MINI_H - h) / 2}px 0`)(shape(p.width, p.height))}" ${thumbs[p.name] ? `src="${thumbs[p.name]}"` : ''}><span class="sp-l"><span class="dot"></span>${esc(p.name)} <small>${esc(p.device)}</small></span></button>`).join('') +
     `<button class="sp add" id="b-add" title="Add space"><span class="mini">+</span><span class="sp-l"><small>Add space</small></span></button>
-     <span class="keys">← → · 1–9 · 0 = All</span>`;
+     <span class="keys">⇧Tab next · ⌃⇧Tab prev · ← → back/fwd · 1–9 · 0 = All</span>`;
   document.querySelectorAll('.sp[data-space]').forEach(b => b.classList.toggle('cur', b.dataset.space === space));
   document.querySelector('.sp.cur')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   $('#spsum').textContent = `(${personas.length}) · ${space}`;
@@ -145,7 +146,8 @@ nstack.on('shots', shots => {
 // the frame (title bar = persona · device · real size) around each visible persona, with nstack's address row above it;
 // logged-out ones get the placeholder
 nstack.on('frames', frames => {
-  for (const f of frames) urls[f.name] = f.url;
+  for (const f of frames) { urls[f.name] = f.url; hist[f.name] = { canBack: f.canBack, canFwd: f.canFwd }; }
+  navs();
   $('#frames').innerHTML = frames.filter(f => f.shown).map(f => `<div class="addr" style="left:${f.addr.x}px;top:${f.addr.y}px;width:${f.addr.width}px">
     <input class="url" data-url="${esc(f.name)}" value="${esc(f.url)}" spellcheck="false" autocomplete="off" aria-label="${esc(f.name)} address"><button data-go="${esc(f.name)}" title="Go">Go</button></div>
   <div class="frame" style="left:${f.rect.x}px;top:${f.rect.y}px;width:${f.rect.width}px;height:${f.rect.height}px">
@@ -154,8 +156,10 @@ nstack.on('frames', frames => {
 });
 
 // a persona navigated; leave the address bar alone while it is being edited
-nstack.on('url', ({ name, path, canBack }) => {
+nstack.on('url', ({ name, path, canBack, canFwd }) => {
   urls[name] = path;
+  hist[name] = { canBack, canFwd };
+  navs();
   const b = document.querySelector(`[data-back="${CSS.escape(name)}"]`);
   if (b) b.disabled = !canBack;
   const i = document.querySelector(`input[data-url="${CSS.escape(name)}"]`);
@@ -309,9 +313,13 @@ $('#spf-form').addEventListener('submit', e => {
 });
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeAll));
 document.querySelectorAll('.scrim').forEach(s => s.addEventListener('click', e => { if (e.target === s) closeAll(); }));
-// All row wider than the stage: a scrollbar under it, and no ‹ › (overflowing views would paint over them)
+// ‹ › = back / forward in the current space, dimmed when there is nowhere to go; none in All (no single page)
 let scroll = { x: 0, max: 0, stage: 1, total: 1 };
-function navs() { $('#b-prev').hidden = $('#b-next').hidden = !personas.length || scroll.max > 0; } // All + one persona is still two spaces
+function navs() {
+  $('#b-prev').hidden = $('#b-next').hidden = space === 'all';
+  $('#b-prev').disabled = !hist[space]?.canBack;
+  $('#b-next').disabled = !hist[space]?.canFwd;
+}
 nstack.on('scroll', s => {
   scroll = s;
   navs();
@@ -334,8 +342,8 @@ $('#hscroll').addEventListener('pointerdown', e => {
 $('#stage').addEventListener('wheel', e => {
   if (scroll.max && (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey)) nstack.send('wheel', { dx: e.deltaX, dy: e.deltaY, shift: e.shiftKey });
 }, { passive: true });
-$('#b-prev').onclick = () => nstack.send('key', 'ArrowLeft');
-$('#b-next').onclick = () => nstack.send('key', 'ArrowRight');
+$('#b-prev').onclick = () => nstack.send('back', space);
+$('#b-next').onclick = () => nstack.send('forward', space);
 $('#b-login').onclick = () => nstack.send('login');
 $('#b-shot').onclick = () => { $('#b-shot').disabled = true; nstack.send('shot'); };
 $('#b-reloadall').onclick = () => { const b = $('#b-reloadall'); b.disabled = true; nstack.send('reload-all'); setTimeout(() => b.disabled = false, 1000); };

@@ -6,7 +6,7 @@ import { addPersona, removePersona, renamePersona, quickName, parseConfig, Confi
 import { parseDevice, rotated, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
 import { partition, newSession, renameSession, dropSession, sweepSessions } from '../sessions.js';
-import { nextSpace, spaceForKey, focusTarget, fitFrames, rowFrames, rowWidth, packFrames, inset, reorder, reloadAll, type Frame, type Rect } from './spaces.js';
+import { nextSpace, keyAction, spaceForKey, focusTarget, fitFrames, rowFrames, rowWidth, packFrames, inset, reorder, reloadAll, type Frame, type Rect } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
 import { shoot } from './shot.js';
@@ -85,7 +85,7 @@ const shift = (r: Rect): Rect => ({ ...r, x: r.x - scrollX });
 // scrolling only moves views; emulation (scale) is redone on a real re-layout only
 function layout(scrollOnly = false) {
   const all = space === 'all', sizes = names.map(dims);
-  // native views paint above the page, so keep 48px clear at each side for the stage's ‹ › arrows (32 here + the 16 gap)
+  // native views paint above the page, so keep 48px clear at each side for the stage's ‹ › back/forward arrows (32 here + the 16 gap)
   const room = { ...stage, x: stage.x + 32, width: Math.max(0, stage.width - 64) };
   // hidden views keep their single-space size so their thumbnails render at a real size
   let frames: Frame[] = !all ? sizes.map(d => fitFrames([inset(room, 16)], [d])[0])
@@ -103,7 +103,7 @@ function layout(scrollOnly = false) {
   });
   win.webContents.send('nstack:scroll', { x: scrollX, max: scrollMax, stage: room.width, total });
   win.webContents.send('nstack:frames', names.map((name, i) => ({
-    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, addr: frames[i].addr, shown: all || name === space, out: out.has(name), touch: devices.get(name)!.touch, landscape: landscape.has(name), url: rel(views.get(name)!.webContents.getURL()), canBack: canBack(name),
+    name, device: config.personas[name].device, size: size(name), rect: frames[i].frame, addr: frames[i].addr, shown: all || name === space, out: out.has(name), touch: devices.get(name)!.touch, landscape: landscape.has(name), url: rel(views.get(name)!.webContents.getURL()), ...canNav(name),
   })));
 }
 
@@ -132,8 +132,10 @@ function focusSpace() {
   if (!covered) (t === 'shell' ? win.webContents : views.get(t)!.webContents).focus();
 }
 
+// keys the shell page (or a persona's preload) forwards: ← / → back and forward in the current space, 1–9 / 0 / a pick one
 const onKey = (key: string) => {
-  const id = key === 'ArrowRight' ? nextSpace(spaces(), space, 1) : key === 'ArrowLeft' ? nextSpace(spaces(), space, -1) : spaceForKey(names, key);
+  if (key === 'ArrowLeft' || key === 'ArrowRight') return space !== 'all' && step(space, key === 'ArrowLeft' ? -1 : 1);
+  const id = spaceForKey(names, key);
   if (id && id !== space) goTo(id);
 };
 
@@ -167,27 +169,32 @@ function reload(who: string[]) {
   for (const n of who) { sync.drive(n); views.get(n)!.webContents.reload(); }
   log(`# reload ${who.join(', ')}`);
 }
-// ⌘/Ctrl+R anywhere in the window (shell page or a persona's page) reloads the current space, or every one in All,
-// never the shell page itself
-// a frame's Back button, Alt+← / ⌘[: one step back in that space; driven like reload, so Sync does not replay it
-function back(name: string) {
-  const wc = views.get(name)?.webContents;
-  if (!wc || out.has(name) || !wc.navigationHistory.canGoBack()) return;
+// a frame's Back button, the stage's ‹ ›, Alt+← / Alt+→, ⌘[ / ⌘]: one step back (-1) or forward (1) in that space;
+// driven like reload, so Sync does not replay it
+function step(name: string, d: -1 | 1) {
+  const wc = views.get(name)?.webContents, h = wc?.navigationHistory;
+  if (!h || out.has(name) || !(d < 0 ? h.canGoBack() : h.canGoForward())) return;
   sync.drive(name);
-  wc.navigationHistory.goBack();
-  log(`# back ${name}`);
+  if (d < 0) h.goBack(); else h.goForward();
+  log(`# ${d < 0 ? 'back' : 'forward'} ${name}`);
 }
-const canBack = (name: string) => views.get(name)!.webContents.navigationHistory.canGoBack();
+const canNav = (name: string) => {
+  const h = views.get(name)!.webContents.navigationHistory;
+  return { canBack: h.canGoBack(), canFwd: h.canGoForward() };
+};
 
-const reloadKey = (e: Electron.Event, i: Electron.Input) => {
+// caught in main before any page sees them, from the shell page (from: undefined) or a persona's page (from: its name):
+// ⌘/Ctrl+R reloads the current space, or every one in All, never the shell page itself; Shift+Tab / Ctrl+Shift+Tab
+// cycle spaces; back / forward act on the page the key was typed in, else the current space (none in All)
+const keys = (e: Electron.Event, i: Electron.Input, from?: string) => {
   if (i.type !== 'keyDown') return;
-  const k = i.key.toLowerCase();
-  if ((i.meta || i.control) && !i.alt && k === 'r') { e.preventDefault(); return i.shift ? reloadAll(views.keys(), reload) : reload(space === 'all' ? names : [space]); }
-  // back: Alt+← (any platform) or ⌘[ (mac), only with one space showing
-  if (space !== 'all' && ((i.alt && !i.meta && !i.control && i.key === 'ArrowLeft') || (process.platform === 'darwin' && i.meta && !i.alt && k === '['))) {
-    e.preventDefault();
-    back(space);
-  }
+  if ((i.meta || i.control) && !i.alt && i.key.toLowerCase() === 'r') { e.preventDefault(); return i.shift ? reloadAll(views.keys(), reload) : reload(space === 'all' ? names : [space]); }
+  const a = keyAction(i, process.platform === 'darwin');
+  if (!a) return;
+  e.preventDefault();
+  if (a === 'next' || a === 'prev') return goTo(nextSpace(spaces(), space, a === 'next' ? 1 : -1));
+  const who = from ?? (space === 'all' ? undefined : space);
+  if (who) step(who, a === 'back' ? -1 : 1);
 };
 
 // ⟳ in a phone's or tablet's frame: portrait ↔ landscape (re-emulated by layout())
@@ -236,7 +243,7 @@ function watchLogin(v: WebContentsView) {
       if (name === space) focusSpace();
     }
     at = to;
-    if (ready) win.webContents.send('nstack:url', { name, path: rel(to), canBack: canBack(name) });
+    if (ready) win.webContents.send('nstack:url', { name, path: rel(to), ...canNav(name) });
     if (!out.has(name)) sync.navigated(name, to);
   };
   v.webContents.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) from = d.url; });
@@ -258,7 +265,7 @@ function open(name: string, fresh = false): Line {
   keepSessionCookies(v.webContents);
   nameOf.set(v, name);
   watchLogin(v);
-  v.webContents.on('before-input-event', reloadKey);
+  v.webContents.on('before-input-event', (e, i) => keys(e, i, nameOf.get(v)));
   win.contentView.addChildView(v);
   v.webContents.on('did-fail-load', (_e, code, desc, url, isMain) => {
     const n = nameOf.get(v);
@@ -276,7 +283,7 @@ function open(name: string, fresh = false): Line {
       const n = alive();
       if (!n) return;
       v.webContents.navigationHistory.clear();
-      if (ready) win.webContents.send('nstack:url', { name: n, path: rel(v.webContents.getURL()), canBack: false });
+      if (ready) win.webContents.send('nstack:url', { name: n, path: rel(v.webContents.getURL()), canBack: false, canFwd: false });
     })
     .catch(() => {});
   return ['', `${pad(name)} ${pad(config.personas[name].device, 9)} ${pad(size(name), 9)} → ${home}`];
@@ -391,7 +398,7 @@ app.whenReady().then(() => {
     webPreferences: { preload: path.join(__dirname, 'shell-preload.js') },
   });
   win.loadFile(path.join(__dirname, '..', '..', '..', 'renderer', 'index.html'));
-  win.webContents.on('before-input-event', reloadKey);
+  win.webContents.on('before-input-event', (e, i) => keys(e, i));
 
   log('nstack up' + (sync.on ? ' --sync' : ''), [['dim', `config ${path.basename(file)} · baseUrl ${config.baseUrl}`], ...names.map(n => open(n))]);
   if (swept.length) log(null, [['dim', `deleted ${swept.length} unused session folder${swept.length > 1 ? 's' : ''} (${swept.join(', ')})`]]);
@@ -418,7 +425,8 @@ app.whenReady().then(() => {
   ipcMain.on('nstack:wheel', (_e, w: { dx: number; dy: number; shift: boolean }) => {
     if (space === 'all' && tile === 'row') scrollTo(scrollX + Number(w.shift && !w.dx ? w.dy : w.dx));
   });
-  ipcMain.on('nstack:back', (_e, name: string) => back(name));
+  ipcMain.on('nstack:back', (_e, name: string) => step(name, -1));
+  ipcMain.on('nstack:forward', (_e, name: string) => step(name, 1));
   ipcMain.on('nstack:reload', (_e, name: string) => reload([name]));
   ipcMain.on('nstack:reload-all', () => reloadAll(views.keys(), reload));
   ipcMain.on('nstack:rotate', (_e, name: string) => rotate(name));
