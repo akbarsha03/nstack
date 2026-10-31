@@ -9,9 +9,11 @@ export const nextSpace = (spaces: string[], cur: string, d: number) =>
 export const focusTarget = (space: string, out: Set<string>) => (space === 'all' || out.has(space) ? 'shell' : space);
 
 // keys caught before any page sees them (shell or persona): browser-style tab and history shortcuts.
-// Shift+Tab and Ctrl+Tab = next space, Ctrl+Shift+Tab = previous; Alt+← / Alt+→ (⌘[ / ⌘] on macOS) = back / forward
+// Shift+Tab and Ctrl+Tab = next space, Ctrl+Shift+Tab = previous; Alt+← / Alt+→ (⌘[ / ⌘] on macOS) = back / forward;
+// ⌘F (macOS) / Ctrl+F = immersive on/off (taken from the page's find-in-page on purpose)
 export type KeyInput = { key: string; shift: boolean; control: boolean; meta: boolean; alt: boolean };
-export function keyAction(i: KeyInput, mac: boolean): 'next' | 'prev' | 'back' | 'forward' | undefined {
+export function keyAction(i: KeyInput, mac: boolean): 'next' | 'prev' | 'back' | 'forward' | 'immersive' | undefined {
+  if ((i.control || (mac && i.meta)) && !i.alt && !i.shift && i.key.toLowerCase() === 'f') return 'immersive';
   if (i.key === 'Tab' && !i.alt && !i.meta) return i.control && i.shift ? 'prev' : i.control || i.shift ? 'next' : undefined;
   if (i.alt && !i.meta && !i.control && !i.shift) return i.key === 'ArrowLeft' ? 'back' : i.key === 'ArrowRight' ? 'forward' : undefined;
   if (mac && i.meta && !i.alt && !i.control && !i.shift) return i.key === '[' ? 'back' : i.key === ']' ? 'forward' : undefined;

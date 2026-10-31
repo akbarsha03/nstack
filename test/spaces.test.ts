@@ -25,6 +25,13 @@ test('browser keys: Shift+Tab cycles spaces, Alt+arrows and ⌘[ ] go back and f
   assert.equal(k('[', { meta: true }), 'back');
   assert.equal(k(']', { meta: true }), 'forward');
   assert.equal(k('[', { meta: true }, false), undefined);
+  assert.equal(k('f', { meta: true }), 'immersive');
+  assert.equal(k('f', { control: true }, false), 'immersive');
+  assert.equal(k('f', { control: true }), 'immersive');
+  assert.equal(k('f', { meta: true }, false), undefined);
+  assert.equal(k('F', { meta: true, shift: true }), undefined);
+  assert.equal(k('f', { meta: true, alt: true }), undefined);
+  assert.equal(k('f'), undefined);
 });
 
 test('a logged-out space hands keyboard focus to the shell, so arrows keep cycling past it', () => {

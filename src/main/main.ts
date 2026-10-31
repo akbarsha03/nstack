@@ -6,7 +6,7 @@ import { addPersona, removePersona, renamePersona, quickName, parseConfig, Confi
 import { parseDevice, rotated, PRESETS, type Device } from '../devices.js';
 import { serve } from '../ipc.js';
 import { partition, newSession, renameSession, dropSession, sweepSessions } from '../sessions.js';
-import { nextSpace, keyAction, spaceForKey, focusTarget, fitFrames, rowFrames, rowWidth, packFrames, inset, reorder, reloadAll, type Frame, type Rect } from './spaces.js';
+import { nextSpace, keyAction, spaceForKey, focusTarget, fitFrames, rowFrames, rowWidth, packFrames, inset, reorder, BAR, ADDR, reloadAll, type Frame, type Rect } from './spaces.js';
 import { keepSessionCookies, emulate, loggedOut } from './persona.js';
 import { login } from './login-window.js';
 import { shoot } from './shot.js';
@@ -78,6 +78,16 @@ const sendState = () => ready && win.webContents.send('nstack:state', {
   space, tile, sync: sync.on, syncPrefs: sync.prefs, personas: names.map(n => ({ name: n, device: config.personas[n].device, width: dims(n).width, height: dims(n).height, out: out.has(n) })),
 });
 
+// immersive (⌘F / Ctrl+F): the renderer hides every bit of shell chrome and the stage gets the whole window (not persisted)
+let immersive = false;
+function setImmersive(on: boolean) {
+  immersive = on;
+  win.webContents.send('nstack:immersive', on);
+  log(`# immersive ${on ? 'on' : 'off'}`);
+  layout();
+  sendState();
+}
+
 // All in row mode scrolls sideways when the row is wider than the stage (not persisted)
 let scrollX = 0, scrollMax = 0;
 const shift = (r: Rect): Rect => ({ ...r, x: r.x - scrollX });
@@ -86,9 +96,12 @@ const shift = (r: Rect): Rect => ({ ...r, x: r.x - scrollX });
 function layout(scrollOnly = false) {
   const all = space === 'all', sizes = names.map(dims);
   // native views paint above the page, so keep 48px clear at each side for the stage's ‹ › back/forward arrows (32 here + the 16 gap)
-  const room = { ...stage, x: stage.x + 32, width: Math.max(0, stage.width - 64) };
+  // immersive: no arrows, and one space fills the stage edge to edge (its cell starts above the stage by the title bar and
+  // address row, which the renderer hides, so only the page itself is laid out inside the stage)
+  const room = immersive ? stage : { ...stage, x: stage.x + 32, width: Math.max(0, stage.width - 64) };
+  const cell = immersive ? { ...stage, y: stage.y - BAR - ADDR, height: stage.height + BAR + ADDR } : inset(room, 16);
   // hidden views keep their single-space size so their thumbnails render at a real size
-  let frames: Frame[] = !all ? sizes.map(d => fitFrames([inset(room, 16)], [d])[0])
+  let frames: Frame[] = !all ? sizes.map(d => fitFrames([cell], [d])[0])
     : tile === 'row' ? rowFrames(room, sizes, 16)
     : packFrames(room, sizes, 16);
   const total = all && tile === 'row' ? rowWidth(room, frames, 16) : 0;
@@ -192,6 +205,7 @@ const keys = (e: Electron.Event, i: Electron.Input, from?: string) => {
   const a = keyAction(i, process.platform === 'darwin');
   if (!a) return;
   e.preventDefault();
+  if (a === 'immersive') return setImmersive(!immersive);
   if (a === 'next' || a === 'prev') return goTo(nextSpace(spaces(), space, a === 'next' ? 1 : -1));
   const who = from ?? (space === 'all' ? undefined : space);
   if (who) step(who, a === 'back' ? -1 : 1);

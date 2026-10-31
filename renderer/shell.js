@@ -26,7 +26,7 @@ function strip() {
     personas.map((p, i) => `<button class="sp ${p.out ? 'out' : ''}" data-space="${esc(p.name)}" draggable="true" title="${esc(p.name)} · ${esc(p.device)} ${p.width}×${p.height} (${i + 1})">
       <span class="sp-x" role="button" data-remove="${esc(p.name)}" title="Remove ${esc(p.name)}">×</span><img class="mini dev ${p.width > p.height ? 'wide' : ''}" alt="" draggable="false" style="${(([w, h]) => `width:${w}px;height:${h}px;margin:${(MINI_H - h) / 2}px 0`)(shape(p.width, p.height))}" ${thumbs[p.name] ? `src="${thumbs[p.name]}"` : ''}><span class="sp-l"><span class="dot"></span>${esc(p.name)} <small>${esc(p.device)}</small></span></button>`).join('') +
     `<button class="sp add" id="b-add" title="Add space"><span class="mini">+</span><span class="sp-l"><small>Add space</small></span></button>
-     <span class="keys">⇧Tab next · ⌃⇧Tab prev · ← → back/fwd · 1–9 · 0 = All</span>`;
+     <span class="keys">⇧Tab next · ⌃⇧Tab prev · ← → back/fwd · 1–9 · 0 = All · ⌘F/⌃F immersive</span>`;
   document.querySelectorAll('.sp[data-space]').forEach(b => b.classList.toggle('cur', b.dataset.space === space));
   document.querySelector('.sp.cur')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   $('#spsum').textContent = `(${personas.length}) · ${space}`;
@@ -125,6 +125,8 @@ nstack.on('state', s => {
   $('#b-sync').setAttribute('aria-pressed', s.sync);
   $('#b-sync').textContent = s.sync ? 'Sync on' : 'Sync';
 });
+// immersive: CSS hides the chrome, #stage grows, and the ResizeObserver below sends main the new stage rect
+nstack.on('immersive', on => document.body.classList.toggle('immersive', on));
 nstack.on('log', log);
 nstack.on('yml', renderYml);
 nstack.on('thumb', (name, url) => {

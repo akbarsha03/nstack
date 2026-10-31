@@ -156,6 +156,9 @@ main{flex:1;position:relative}
 .drawer .dh{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font:13px var(--mono)}
 .drawer pre{margin:0;padding:14px;overflow:auto;font:12px/1.6 var(--mono);flex:1}
 .y-c{color:var(--dim)}.y-k{color:#93c5fd}.y-s{color:#fcd34d}
+/* immersive (⌘F / Ctrl+F): only the pages; the stage takes the whole window and main lays the views over all of it */
+body.immersive :is(.top,#strip,#term,#yml,#hscroll,.nav,.addr,.frame .bar){display:none}
+body.immersive .frame{background:none;border:0;border-radius:0;box-shadow:none}
 @media (max-width:900px){.top .base,.keys{display:none}}
 </style>
 </head>
